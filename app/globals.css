@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --ig-purple: #833ab4;
+  --ig-pink: #c13584;
+  --ig-red: #fd1d1d;
+  --ig-orange: #f56040;
+  --ig-yellow: #fcb045;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #ffffff;
+  color: #0f172a;
+  font-family: var(--font-amiri), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Instagram gradient accents */
+.bg-ig-gradient {
+  background: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+}
+
+.text-ig-gradient {
+  background: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-ig-gradient {
+  border-image: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%) 1;
+}
+
+.hero-ig-radial {
+  background: radial-gradient(circle at 50% -10%, #fdf2f8 0%, #fff7ed 40%, #ffffff 80%);
+}
+
+.glow-ig {
+  box-shadow: 0 10px 30px -5px rgba(225, 48, 108, 0.25);
+}
