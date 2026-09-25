@@ -1,10 +1,11 @@
 import { MetadataRoute } from "next";
+import { REELSER_PSEO_PAGES } from "@/lib/pseo-data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://reelser.com";
   const now = new Date();
 
-  const routes = [
+  const coreRoutes = [
     { path: "", priority: 1.0, changeFrequency: "daily" as const },
     { path: "/reels", priority: 0.95, changeFrequency: "daily" as const },
     { path: "/story-saver", priority: 0.9, changeFrequency: "daily" as const },
@@ -16,7 +17,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/dmca", priority: 0.3, changeFrequency: "monthly" as const },
   ];
 
-  return routes.map((r) => ({
+  const pseoRoutes = Object.keys(REELSER_PSEO_PAGES).map((slug) => ({
+    path: `/${slug}`,
+    priority: 0.85,
+    changeFrequency: "weekly" as const,
+  }));
+
+  return [...coreRoutes, ...pseoRoutes].map((r) => ({
     url: `${baseUrl}${r.path}`,
     lastModified: now,
     changeFrequency: r.changeFrequency,
