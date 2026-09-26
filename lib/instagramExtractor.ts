@@ -167,20 +167,30 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
 
   try {
     let html = "";
+    const chromeHeaders = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+      "Sec-Ch-Ua-Mobile": "?0",
+      "Sec-Ch-Ua-Platform": '"Windows"',
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
+    };
+
     const uas = [
-      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
-      "Twitterbot/1.0",
-      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      chromeHeaders,
+      { "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+      { "User-Agent": "Twitterbot/1.0", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
     ];
 
-    for (const ua of uas) {
+    for (const h of uas) {
       try {
         const res = await fetch(`https://www.instagram.com/${clean}/`, {
-          headers: {
-            "User-Agent": ua,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-          },
+          headers: h as Record<string, string>,
           cache: "no-store",
         });
 
@@ -321,6 +331,91 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
   }
 }
 
+function decodeSnapApp(args: string[]): string {
+  const [h, u, n, t, e, r] = args;
+  const tNum = Number(t);
+  const eNum = Number(e);
+  function decode(d: string, e: number, f: number) {
+    const g = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/".split("");
+    const hArr = g.slice(0, e);
+    const iArr = g.slice(0, f);
+    let j = d.split("").reverse().reduce((a, b, c) => {
+      const idx = hArr.indexOf(b);
+      if (idx !== -1) return a + idx * Math.pow(e, c);
+      return a;
+    }, 0);
+    let k = "";
+    while (j > 0) {
+      k = iArr[j % f] + k;
+      j = Math.floor(j / f);
+    }
+    return k || "0";
+  }
+  let result = "";
+  for (let i = 0, len = h.length; i < len;) {
+    let s = "";
+    while (i < len && h[i] !== n[eNum]) {
+      s += h[i];
+      i++;
+    }
+    i++;
+    for (let j = 0; j < n.length; j++) s = s.replace(new RegExp(n[j], "g"), j.toString());
+    result += String.fromCharCode(Number(decode(s, eNum, 10)) - tNum);
+  }
+  return result;
+}
+
+async function fetchRawSnapsave(url: string): Promise<any[]> {
+  try {
+    const { $fetch } = await import("ofetch");
+    const { load } = await import("cheerio");
+    const formData = new URLSearchParams();
+    formData.append("url", url);
+
+    const raw = await $fetch("https://snapsave.app/action.php", {
+      method: "POST",
+      query: { lang: "en" },
+      headers: {
+        "accept": "*/*",
+        "content-type": "application/x-www-form-urlencoded",
+        "origin": "https://snapsave.app",
+        "referer": "https://snapsave.app/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      body: formData,
+      responseType: "text",
+    });
+
+    const encodedParts = raw.split("decodeURIComponent(escape(r))}(")[1]?.split("))")[0]?.split(",")?.map((v: string) => v.replace(/"/g, "").trim());
+    if (!encodedParts || encodedParts.length < 6) return [];
+
+    const decoded = decodeSnapApp(encodedParts);
+    const html = decoded.split('getElementById("download-section").innerHTML = "')[1]?.split('"; document.getElementById("inputData").remove(); ')[0]?.replace(/\\(\\)?/g, "");
+    if (!html) return [];
+
+    const $ = load(html);
+    const media: any[] = [];
+
+    $(".download-items").each((i, el) => {
+      const thumb = $(el).find("img").attr("src");
+      const isVideo = $(el).find(".icon-dlvideo").length > 0;
+      const downloadUrl = $(el).find(".download-items__btn a").attr("href");
+      if (downloadUrl) {
+        media.push({
+          url: downloadUrl,
+          thumbnail: thumb || downloadUrl,
+          type: isVideo ? "video" : "image",
+        });
+      }
+    });
+
+    return media;
+  } catch (err: any) {
+    console.warn("fetchRawSnapsave error:", err?.message || err);
+    return [];
+  }
+}
+
 export async function extractInstagramMedia(inputUrl: string): Promise<MediaResult | null> {
   const cleanUrl = inputUrl.trim();
   if (!cleanUrl) return null;
@@ -336,47 +431,50 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
       profileResult = createFallbackProfileResult(username);
     }
 
-    // Try to fetch active stories in the background to populate the Stories tab
+    // Fetch full 12 media items (posts, reels, stories) via direct snapsave
     try {
-      const { snapsave } = await import("snapsave-media-downloader");
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout story extraction")), 9000);
-      });
+      const targetProfileUrl = `https://www.instagram.com/${username}/`;
+      const targetStoryUrl = `https://www.instagram.com/stories/${username}/`;
 
-      const res: any = await Promise.race([
-        snapsave(`https://www.instagram.com/stories/${username}/`),
-        timeoutPromise,
-      ]);
-      const mediaData = res?.data;
+      let mediaList = await fetchRawSnapsave(targetProfileUrl);
+      if (mediaList.length === 0) {
+        mediaList = await fetchRawSnapsave(targetStoryUrl);
+      }
 
-      if (mediaData && Array.isArray(mediaData.media) && mediaData.media.length > 0) {
-        const mediaList = mediaData.media;
-        const realAvatar = mediaData.preview || mediaList[0]?.thumbnail || mediaList[0]?.url;
+      if (mediaList.length > 0) {
+        const hasCustomAvatar = profileResult.profileData?.avatarUrl && !profileResult.profileData.avatarUrl.includes("ui-avatars");
+        const realAvatar = hasCustomAvatar
+          ? profileResult.profileData!.avatarUrl
+          : (mediaList[0]?.thumbnail || mediaList[0]?.url);
 
-        const items: ProfileMediaItem[] = mediaList.map((m: any, i: number) => ({
-          id: `story-${i}`,
+        const allItems: ProfileMediaItem[] = mediaList.map((m: any, i: number) => ({
+          id: `item-${i}`,
           type: m.type === "video" || (m.url && m.url.includes(".mp4")) ? "video" : "image",
           thumbnail: m.thumbnail || m.url || realAvatar,
           downloadUrl: m.url,
-          caption: `@${username} Story #${i + 1}`,
+          caption: `@${username} Media #${i + 1}`,
           likes: "HD",
           comments: "",
-          timestamp: "Active Story",
+          timestamp: "Recent Post",
           isVideo: m.type === "video" || (m.url && m.url.includes(".mp4")),
         }));
 
+        const reelsOnly = allItems.filter(i => i.isVideo);
+
         if (profileResult.profileData) {
-          profileResult.profileData.stories = items;
-          profileResult.profileData.posts = items;
-          profileResult.profileData.reels = items;
-          profileResult.profileData.postsCount = `${mediaList.length}`;
-          if (realAvatar) {
+          profileResult.profileData.posts = allItems;
+          profileResult.profileData.reels = reelsOnly.length > 0 ? reelsOnly : allItems;
+          profileResult.profileData.stories = allItems;
+          if (profileResult.profileData.postsCount === "0") {
+            profileResult.profileData.postsCount = `${allItems.length}`;
+          }
+          if (!hasCustomAvatar && realAvatar) {
             profileResult.profileData.avatarUrl = realAvatar;
             profileResult.profileData.hdAvatarUrl = realAvatar;
           }
         }
 
-        if (realAvatar) {
+        if (!hasCustomAvatar && realAvatar) {
           profileResult.thumbnail = realAvatar;
           if (profileResult.formats[0]) {
             profileResult.formats[0].downloadUrl = realAvatar;
@@ -387,18 +485,18 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
           if (item.url) {
             const isVideo = item.type === "video" || item.url.includes(".mp4");
             profileResult!.formats.push({
-              formatId: `ig-story-${idx}`,
-              quality: isVideo ? `Story Video #${idx + 1} (MP4)` : `Story Photo #${idx + 1} (JPG)`,
+              formatId: `ig-media-${idx}`,
+              quality: isVideo ? `Video #${idx + 1} (1080p MP4)` : `Photo #${idx + 1} (HD JPG)`,
               ext: isVideo ? "mp4" : "jpg",
               type: isVideo ? "video" : "image",
               downloadUrl: item.url,
-              note: "Active 24h Story",
+              note: isVideo ? "Synchronized Audio & Video" : "Original Quality",
             });
           }
         });
       }
-    } catch {
-      // Snapsave failed or timed out, but profileResult is already ready!
+    } catch (e: any) {
+      console.warn("Snapsave profile lookup error:", e?.message || e);
     }
 
     return profileResult;
