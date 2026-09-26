@@ -324,6 +324,45 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
       return null;
     }
 
+    if (username) {
+      const items: ProfileMediaItem[] = mediaList.map((m: any, i: number) => ({
+        id: `story-${i}`,
+        type: m.type === "video" || (m.url && m.url.includes(".mp4")) ? "video" : "image",
+        thumbnail: m.thumbnail || m.url,
+        downloadUrl: m.url,
+        caption: `@${username} Story #${i + 1}`,
+        likes: "HD",
+        comments: "",
+        timestamp: "Active Story",
+        isVideo: m.type === "video" || (m.url && m.url.includes(".mp4")),
+      }));
+
+      return {
+        url: cleanUrl,
+        title: `@${username}`,
+        author: `@${username}`,
+        thumbnail: mediaData.preview || mediaList[0]?.thumbnail || mediaList[0]?.url,
+        platform: "Instagram",
+        formats,
+        isProfile: true,
+        profileData: {
+          username,
+          fullName: `@${username}`,
+          avatarUrl: mediaData.preview || mediaList[0]?.thumbnail || mediaList[0]?.url,
+          hdAvatarUrl: mediaData.preview || mediaList[0]?.thumbnail || mediaList[0]?.url,
+          postsCount: `${mediaList.length}`,
+          followersCount: "Public",
+          followingCount: "Instagram",
+          biography: `Instagram Creator @${username}`,
+          isVerified: false,
+          posts: items,
+          stories: items,
+          highlights: [],
+          reels: items,
+        },
+      };
+    }
+
     return {
       url: cleanUrl,
       title,
