@@ -288,7 +288,7 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
     };
   } catch (err: any) {
     console.warn("Instagram profile extraction error:", err?.message || err);
-    return null;
+    return createFallbackProfileResult(clean);
   }
 }
 
@@ -431,7 +431,8 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
   } catch (err: any) {
     console.warn("Instagram extraction error:", err?.message || err);
     if (username) {
-      return await extractInstagramProfile(username);
+      const prof = await extractInstagramProfile(username);
+      return prof || createFallbackProfileResult(username);
     }
     return null;
   }
