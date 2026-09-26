@@ -115,6 +115,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
               <img
                 src={profile.avatarUrl}
                 alt={profile.fullName}
+                referrerPolicy="no-referrer"
                 className="w-full h-full rounded-full object-cover bg-gray-100"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
@@ -266,6 +267,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                   <img
                     src={item.thumbnail}
                     alt={item.caption || "Instagram Post"}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
@@ -341,6 +343,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                     <img
                       src={story.thumbnail}
                       alt="Instagram Story"
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-3 right-3 flex items-center gap-2">
@@ -433,6 +436,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                   <img
                     src={hl.cover}
                     alt={hl.title}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full rounded-full object-cover bg-gray-100"
                   />
                 </div>
@@ -463,6 +467,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                   <img
                     src={item.thumbnail}
                     alt="Instagram Reel"
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute top-3 right-3">
@@ -539,6 +544,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
               <img
                 src={profile.hdAvatarUrl}
                 alt={profile.fullName}
+                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =

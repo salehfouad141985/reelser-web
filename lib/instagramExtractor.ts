@@ -161,120 +161,212 @@ export function createFallbackProfileResult(username: string): MediaResult {
   };
 }
 
+async function fetchPublicProfileMetadata(username: string): Promise<{
+  username: string;
+  fullName: string;
+  avatarUrl: string;
+  hdAvatarUrl: string;
+  postsCount: string;
+  followersCount: string;
+  followingCount: string;
+  biography: string;
+  isVerified?: boolean;
+} | null> {
+  const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
+  if (!clean) return null;
+
+  try {
+    const res = await fetch(`https://insta-stories-viewer.com/${encodeURIComponent(clean)}/`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) return null;
+
+    const html = await res.text();
+    const { load } = await import("cheerio");
+    const $ = load(html);
+
+    const rawAvatar = $(".profile__avatar-pic").attr("src") || "";
+    const postsCount = $(".profile__stats-posts").text().trim() || "";
+    const followersCount = $(".profile__stats-followers").text().trim() || "";
+    const followingCount = $(".profile__stats-follows").text().trim() || "";
+    const bio = $(".profile__description").text().trim() || "";
+    const nickname = $(".profile__nickname").text().replace(/\(Anonymous profile view\)/i, "").trim() || clean;
+    const isVerified = $(".profile__nickname-is-verify").length > 0;
+
+    let exactFollowers = "";
+    let exactPosts = "";
+    let exactFollowing = "";
+    const chartMatch = html.match(/var\s+CHART_DATA\s*=\s*({[^;]+});/);
+    if (chartMatch) {
+      try {
+        const chart = JSON.parse(chartMatch[1]);
+        const keys = Object.keys(chart);
+        if (keys.length > 0) {
+          const latest = chart[keys[keys.length - 1]];
+          if (latest.followers) exactFollowers = Number(latest.followers).toLocaleString();
+          if (latest.posts) exactPosts = Number(latest.posts).toLocaleString();
+          if (latest.followings) exactFollowing = Number(latest.followings).toLocaleString();
+        }
+      } catch {}
+    }
+
+    if (rawAvatar || followersCount) {
+      const proxiedAvatar = rawAvatar.startsWith("http")
+        ? `/api/proxy?url=${encodeURIComponent(rawAvatar)}`
+        : rawAvatar;
+
+      return {
+        username: clean,
+        fullName: nickname,
+        avatarUrl: proxiedAvatar || rawAvatar,
+        hdAvatarUrl: proxiedAvatar || rawAvatar,
+        postsCount: exactPosts || postsCount || "0",
+        followersCount: exactFollowers || followersCount || "Public",
+        followingCount: exactFollowing || followingCount || "Instagram",
+        biography: bio || `Instagram Creator @${clean}`,
+        isVerified,
+      };
+    }
+  } catch (err: any) {
+    console.warn("fetchPublicProfileMetadata error:", err?.message || err);
+  }
+  return null;
+}
+
 export async function extractInstagramProfile(username: string): Promise<MediaResult | null> {
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
   if (!clean) return null;
 
   try {
-    let html = "";
-    const chromeHeaders = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-      "Sec-Ch-Ua-Mobile": "?0",
-      "Sec-Ch-Ua-Platform": '"Windows"',
-      "Sec-Fetch-Dest": "document",
-      "Sec-Fetch-Mode": "navigate",
-      "Sec-Fetch-Site": "none",
-      "Sec-Fetch-User": "?1",
-      "Upgrade-Insecure-Requests": "1",
-    };
+    // 1. Fetch public profile metadata from residential viewer mirror
+    const publicMetaPromise = fetchPublicProfileMetadata(clean);
 
-    const uas = [
-      chromeHeaders,
-      { "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
-      { "User-Agent": "Twitterbot/1.0", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
-    ];
-
-    for (const h of uas) {
+    // 2. Also attempt direct Instagram request (in case residential proxy / client IP is direct)
+    const directPromise = (async () => {
       try {
+        const chromeHeaders = {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          "Sec-Ch-Ua-Mobile": "?0",
+          "Sec-Ch-Ua-Platform": '"Windows"',
+          "Sec-Fetch-Dest": "document",
+          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Site": "none",
+          "Sec-Fetch-User": "?1",
+          "Upgrade-Insecure-Requests": "1",
+        };
+
         const res = await fetch(`https://www.instagram.com/${clean}/`, {
-          headers: h as Record<string, string>,
+          headers: chromeHeaders,
           cache: "no-store",
+          signal: AbortSignal.timeout(5000),
         });
 
-        if (res.ok) {
-          const text = await res.text();
-          if (text.includes("og:image") || text.includes("profile_pic_url")) {
-            html = text;
-            break;
-          }
-          if (!html && text.length > 500) {
-            html = text;
+        if (!res.ok) return null;
+        const html = await res.text();
+        const { load } = await import("cheerio");
+        const $ = load(html);
+
+        const ogImg =
+          $('meta[property="og:image"]').attr("content") ||
+          $('meta[name="og:image"]').attr("content") ||
+          $('meta[name="twitter:image"]').attr("content") ||
+          (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] ||
+          "";
+
+        const ogTitle =
+          $('meta[property="og:title"]').attr("content") ||
+          $('meta[name="og:title"]').attr("content") ||
+          $("title").text() ||
+          "";
+
+        const ogDesc =
+          $('meta[property="og:description"]').attr("content") ||
+          $('meta[name="description"]').attr("content") ||
+          "";
+
+        // Detect datacenter login block or placeholder
+        const isLoginBlock =
+          ogTitle.toLowerCase().includes("login") ||
+          ogTitle.toLowerCase().includes("تسجيل الدخول") ||
+          ogTitle.trim() === "Instagram" ||
+          ogImg.includes("rsrc.php") ||
+          ogImg.includes("static.cdninstagram.com");
+
+        if (isLoginBlock || !ogImg) {
+          return null;
+        }
+
+        const cleanImg = ogImg.replace(/&amp;/g, "&");
+        const hdMatch = html.match(/"profile_pic_url_hd":"([^"]+)"/) || html.match(/"profile_pic_url":"([^"]+)"/);
+        let hdImg = cleanImg;
+        if (hdMatch) {
+          try {
+            hdImg = JSON.parse(`"${hdMatch[1]}"`);
+          } catch {
+            hdImg = hdMatch[1];
           }
         }
+
+        const decodedTitle = decodeHtmlEntities(ogTitle);
+        let displayName = clean;
+        if (decodedTitle) {
+          const matchName = decodedTitle.match(/^([^(]+)/);
+          if (matchName && matchName[1].trim() && matchName[1].trim() !== "Instagram") {
+            displayName = matchName[1].trim();
+          }
+        }
+
+        const decodedDesc = decodeHtmlEntities(ogDesc);
+        const followersCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Followers/i) || [])[1] || "Public";
+        const followingCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Following/i) || [])[1] || "Instagram";
+        const postsCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Posts/i) || [])[1] || "0";
+
+        const bioText = decodedDesc
+          ? decodedDesc
+              .replace(/[\d.,]+[KkMmBb]?\s+Followers,\s+[\d.,]+[KkMmBb]?\s+Following,\s+[\d.,]+[KkMmBb]?\s+Posts\s*-\s*See\s+Instagram\s+photos\s+and\s+videos\s+from\s+/i, "")
+              .replace(new RegExp(`^${displayName}\\s*\\(@${clean}\\)`, "i"), "")
+              .trim()
+          : "";
+
+        return {
+          username: clean,
+          fullName: displayName,
+          avatarUrl: hdImg || cleanImg,
+          hdAvatarUrl: hdImg || cleanImg,
+          postsCount,
+          followersCount,
+          followingCount,
+          biography: bioText,
+          isVerified: decodedTitle.includes("Verified") || html.includes('"is_verified":true'),
+        };
       } catch {
-        // try next ua
+        return null;
       }
-    }
+    })();
 
-    if (!html) {
+    const [publicMeta, directMeta] = await Promise.all([publicMetaPromise, directPromise]);
+    const chosen = directMeta || publicMeta;
+
+    if (!chosen) {
       return createFallbackProfileResult(clean);
     }
 
-    const { load } = await import("cheerio");
-    const $ = load(html);
-
-    const ogImg =
-      $('meta[property="og:image"]').attr("content") ||
-      $('meta[name="og:image"]').attr("content") ||
-      $('meta[name="twitter:image"]').attr("content") ||
-      (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] ||
-      (html.match(/content="([^"]+)"\s+property="og:image"/) || [])[1] ||
-      "";
-
-    const ogTitle =
-      $('meta[property="og:title"]').attr("content") ||
-      $('meta[name="og:title"]').attr("content") ||
-      $("title").text() ||
-      "";
-
-    const ogDesc =
-      $('meta[property="og:description"]').attr("content") ||
-      $('meta[name="description"]').attr("content") ||
-      "";
-
-    // If redirected to login or blocked or empty title/img
-    if (!ogImg && !ogTitle) {
-      return createFallbackProfileResult(clean);
-    }
-    if ((ogTitle.toLowerCase().includes("login") || ogTitle.toLowerCase().includes("تسجيل الدخول")) && !ogImg) {
-      return createFallbackProfileResult(clean);
-    }
-
-    const cleanImg = ogImg ? ogImg.replace(/&amp;/g, "&") : "";
-    const hdMatch = html.match(/"profile_pic_url_hd":"([^"]+)"/) || html.match(/"profile_pic_url":"([^"]+)"/);
-    let hdImg = cleanImg;
-    if (hdMatch) {
-      try {
-        hdImg = JSON.parse(`"${hdMatch[1]}"`);
-      } catch {
-        hdImg = hdMatch[1];
-      }
-    }
-
-    if (!hdImg && !cleanImg) {
-      hdImg = `https://www.instagram.com/${clean}/media/?size=l`;
-    }
-
-    // Decode full title and name
-    const decodedTitle = decodeHtmlEntities(ogTitle || "");
-    let displayName = clean;
-    if (decodedTitle) {
-      const matchName = decodedTitle.match(/^([^(]+)/);
-      if (matchName) displayName = matchName[1].trim();
-    }
-
-    // Decode stats from og:description
-    const decodedDesc = decodeHtmlEntities(ogDesc || "");
-    const followersCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Followers/i) || [])[1] || "Public";
-    const followingCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Following/i) || [])[1] || "Instagram";
-    const postsCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Posts/i) || [])[1] || "0";
-
-    const bioText = decodedDesc
-      ? decodedDesc.replace(/[\d.,]+[KkMmBb]?\s+Followers,\s+[\d.,]+[KkMmBb]?\s+Following,\s+[\d.,]+[KkMmBb]?\s+Posts\s*-\s*See\s+Instagram\s+photos\s+and\s+videos\s+from\s+/i, "").replace(new RegExp(`^${displayName}\\s*\\(@${clean}\\)`, "i"), "").trim()
-      : `Instagram Creator @${clean}`;
+    const fullName = directMeta?.fullName || publicMeta?.fullName || clean;
+    const avatarUrl = directMeta?.avatarUrl || publicMeta?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
+    const hdAvatarUrl = directMeta?.hdAvatarUrl || publicMeta?.hdAvatarUrl || avatarUrl;
+    const postsCount = publicMeta?.postsCount || directMeta?.postsCount || "0";
+    const followersCount = publicMeta?.followersCount || directMeta?.followersCount || "Public";
+    const followingCount = publicMeta?.followingCount || directMeta?.followingCount || "Instagram";
+    const biography = publicMeta?.biography || directMeta?.biography || `Instagram Creator @${clean}`;
+    const isVerified = Boolean(directMeta?.isVerified || publicMeta?.isVerified);
 
     const formats: MediaFormat[] = [
       {
@@ -282,33 +374,32 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
         quality: "Full HD Profile Picture (Original JPG)",
         ext: "jpg",
         type: "image",
-        downloadUrl: hdImg || cleanImg,
+        downloadUrl: hdAvatarUrl,
         note: `Profile avatar of @${clean}`,
       },
     ];
 
-    if (cleanImg && cleanImg !== hdImg) {
+    if (avatarUrl && avatarUrl !== hdAvatarUrl) {
       formats.push({
         formatId: "ig-avatar-sd",
         quality: "Standard Profile Picture (JPG)",
         ext: "jpg",
         type: "image",
-        downloadUrl: cleanImg,
+        downloadUrl: avatarUrl,
         note: "Standard Quality",
       });
     }
 
-    // Build rich ProfileData
     const profileData: ProfileData = {
       username: clean,
-      fullName: displayName,
-      avatarUrl: hdImg || cleanImg,
-      hdAvatarUrl: hdImg || cleanImg,
-      postsCount: postsCount || "0",
-      followersCount: followersCount || "0",
-      followingCount: followingCount || "0",
-      biography: bioText || `${displayName} on Instagram (@${clean})`,
-      isVerified: decodedTitle.includes("Verified") || html.includes('"is_verified":true'),
+      fullName,
+      avatarUrl,
+      hdAvatarUrl,
+      postsCount,
+      followersCount,
+      followingCount,
+      biography,
+      isVerified,
       posts: [],
       stories: [],
       highlights: [],
@@ -317,9 +408,9 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
 
     return {
       url: `https://www.instagram.com/${clean}/`,
-      title: `${displayName} (@${clean})`,
+      title: `${fullName} (@${clean})`,
       author: `@${clean}`,
-      thumbnail: hdImg || cleanImg,
+      thumbnail: avatarUrl,
       platform: "Instagram",
       formats,
       isProfile: true,
@@ -442,15 +533,11 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
       }
 
       if (mediaList.length > 0) {
-        const hasCustomAvatar = profileResult.profileData?.avatarUrl && !profileResult.profileData.avatarUrl.includes("ui-avatars");
-        const realAvatar = hasCustomAvatar
-          ? profileResult.profileData!.avatarUrl
-          : (mediaList[0]?.thumbnail || mediaList[0]?.url);
-
+        const currentAvatar = profileResult.profileData?.avatarUrl || profileResult.thumbnail;
         const allItems: ProfileMediaItem[] = mediaList.map((m: any, i: number) => ({
           id: `item-${i}`,
           type: m.type === "video" || (m.url && m.url.includes(".mp4")) ? "video" : "image",
-          thumbnail: m.thumbnail || m.url || realAvatar,
+          thumbnail: m.thumbnail || m.url || currentAvatar,
           downloadUrl: m.url,
           caption: `@${username} Media #${i + 1}`,
           likes: "HD",
@@ -465,19 +552,8 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
           profileResult.profileData.posts = allItems;
           profileResult.profileData.reels = reelsOnly.length > 0 ? reelsOnly : allItems;
           profileResult.profileData.stories = allItems;
-          if (profileResult.profileData.postsCount === "0") {
+          if (profileResult.profileData.postsCount === "0" || profileResult.profileData.postsCount === "Public") {
             profileResult.profileData.postsCount = `${allItems.length}`;
-          }
-          if (!hasCustomAvatar && realAvatar) {
-            profileResult.profileData.avatarUrl = realAvatar;
-            profileResult.profileData.hdAvatarUrl = realAvatar;
-          }
-        }
-
-        if (!hasCustomAvatar && realAvatar) {
-          profileResult.thumbnail = realAvatar;
-          if (profileResult.formats[0]) {
-            profileResult.formats[0].downloadUrl = realAvatar;
           }
         }
 
