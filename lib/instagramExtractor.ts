@@ -166,21 +166,43 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
   if (!clean) return null;
 
   try {
-    const res = await fetch(`https://www.instagram.com/${clean}/`, {
-      headers: {
-        "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-      },
-      next: { revalidate: 300 },
-    });
+    let html = "";
+    const uas = [
+      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+      "Twitterbot/1.0",
+      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+    ];
 
-    if (!res.ok) {
+    for (const ua of uas) {
+      try {
+        const res = await fetch(`https://www.instagram.com/${clean}/`, {
+          headers: {
+            "User-Agent": ua,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          cache: "no-store",
+        });
+
+        if (res.ok) {
+          const text = await res.text();
+          if (text.includes("og:image") || text.includes("profile_pic_url")) {
+            html = text;
+            break;
+          }
+          if (!html && text.length > 500) {
+            html = text;
+          }
+        }
+      } catch {
+        // try next ua
+      }
+    }
+
+    if (!html) {
       return createFallbackProfileResult(clean);
     }
 
-    const html = await res.text();
     const { load } = await import("cheerio");
     const $ = load(html);
 
