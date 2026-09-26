@@ -7,6 +7,40 @@ export interface MediaFormat {
   note?: string;
 }
 
+export interface ProfileMediaItem {
+  id: string;
+  type: "video" | "image";
+  thumbnail: string;
+  downloadUrl: string;
+  caption?: string;
+  likes?: string;
+  comments?: string;
+  timestamp?: string;
+  isVideo?: boolean;
+}
+
+export interface ProfileHighlightItem {
+  id: string;
+  title: string;
+  cover: string;
+}
+
+export interface ProfileData {
+  username: string;
+  fullName: string;
+  avatarUrl: string;
+  hdAvatarUrl: string;
+  postsCount: string;
+  followersCount: string;
+  followingCount: string;
+  biography: string;
+  isVerified?: boolean;
+  posts: ProfileMediaItem[];
+  stories: ProfileMediaItem[];
+  highlights: ProfileHighlightItem[];
+  reels: ProfileMediaItem[];
+}
+
 export interface MediaResult {
   url: string;
   title: string;
@@ -16,6 +50,8 @@ export interface MediaResult {
   durationSeconds?: number;
   platform: "Instagram";
   formats: MediaFormat[];
+  isProfile?: boolean;
+  profileData?: ProfileData;
 }
 
 export function extractInstagramShortcode(url: string): string | null {
@@ -72,6 +108,20 @@ export function isValidInstagramUrl(url: string): boolean {
   return false;
 }
 
+function decodeHtmlEntities(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&#064;/g, "@")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/[\u200e\u200f]/g, "")
+    .trim();
+}
+
 export async function extractInstagramProfile(username: string): Promise<MediaResult | null> {
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
   if (!clean) return null;
@@ -109,14 +159,22 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
       }
     }
 
+    // Decode full title and name
+    const decodedTitle = decodeHtmlEntities(ogTitle || "");
     let displayName = clean;
-    if (ogTitle) {
-      const matchName = ogTitle.match(/^([^(]+)/);
+    if (decodedTitle) {
+      const matchName = decodedTitle.match(/^([^(]+)/);
       if (matchName) displayName = matchName[1].trim();
     }
 
-    const bioText = ogDesc
-      ? ogDesc.replace(/&#064;/g, "@").replace(/&quot;/g, '"').replace(/&amp;/g, "&")
+    // Decode stats from og:description
+    const decodedDesc = decodeHtmlEntities(ogDesc || "");
+    const followersCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Followers/i) || [])[1] || "";
+    const followingCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Following/i) || [])[1] || "";
+    const postsCount = (decodedDesc.match(/([\d.,]+[KkMmBb]?)\s+Posts/i) || [])[1] || "";
+
+    const bioText = decodedDesc
+      ? decodedDesc.replace(/[\d.,]+[KkMmBb]?\s+Followers,\s+[\d.,]+[KkMmBb]?\s+Following,\s+[\d.,]+[KkMmBb]?\s+Posts\s*-\s*See\s+Instagram\s+photos\s+and\s+videos\s+from\s+/i, "").replace(new RegExp(`^${displayName}\\s*\\(@${clean}\\)`, "i"), "").trim()
       : "";
 
     const formats: MediaFormat[] = [];
@@ -127,7 +185,7 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
         ext: "jpg",
         type: "image",
         downloadUrl: hdImg,
-        note: bioText ? bioText.slice(0, 90) : "High-Resolution Display Picture",
+        note: `Profile avatar of @${clean}`,
       });
     }
 
@@ -142,13 +200,32 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
       });
     }
 
+    // Build rich ProfileData
+    const profileData: ProfileData = {
+      username: clean,
+      fullName: displayName,
+      avatarUrl: hdImg || cleanImg,
+      hdAvatarUrl: hdImg || cleanImg,
+      postsCount: postsCount || "0",
+      followersCount: followersCount || "0",
+      followingCount: followingCount || "0",
+      biography: bioText || `${displayName} on Instagram (@${clean})`,
+      isVerified: decodedTitle.includes("Verified") || html.includes('"is_verified":true'),
+      posts: [],
+      stories: [],
+      highlights: [],
+      reels: [],
+    };
+
     return {
       url: `https://www.instagram.com/${clean}/`,
-      title: `${displayName} (@${clean}) Profile & DP`,
+      title: `${displayName} (@${clean})`,
       author: `@${clean}`,
       thumbnail: hdImg || cleanImg,
       platform: "Instagram",
       formats,
+      isProfile: true,
+      profileData,
     };
   } catch (err: any) {
     console.warn("Instagram profile extraction error:", err?.message || err);

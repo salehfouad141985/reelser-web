@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { MediaResult, MediaFormat } from "@/lib/instagramExtractor";
 import { Download, Film, Music, Image as ImageIcon, Check, ExternalLink, Play } from "lucide-react";
 import { useLanguage } from "./LanguageProvider";
+import { ProfileViewer } from "./ProfileViewer";
 
 interface MediaCardProps {
   media: MediaResult;
@@ -12,6 +13,11 @@ interface MediaCardProps {
 export function MediaCard({ media }: MediaCardProps) {
   const { t } = useLanguage();
   const [downloadingFormatId, setDownloadingFormatId] = useState<string | null>(null);
+
+  // If the result is a full Instagram profile, render the StoriesIG Profile Viewer experience
+  if (media.isProfile && media.profileData) {
+    return <ProfileViewer profile={media.profileData} media={media} />;
+  }
 
   const getFormatIcon = (type: MediaFormat["type"]) => {
     switch (type) {
