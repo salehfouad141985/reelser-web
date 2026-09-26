@@ -247,7 +247,7 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="text-[11px] font-bold text-gray-900 block truncate">
-                      Instagram Reel #HD1080p
+                      Instagram Reel #MP4
                     </span>
                     <span className="text-[10px] text-green-600 font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Ready for Download
@@ -260,7 +260,7 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                   <div className="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-pink-600 to-rose-600 shadow-sm flex items-center justify-between cursor-default">
                     <div className="flex items-center gap-2">
                       <Film className="w-4 h-4" />
-                      <span>{isRtl ? "تحميل فيديو MP4 (Full HD)" : "Download Video (1080p MP4)"}</span>
+                      <span>{isRtl ? "تحميل فيديو MP4" : "Download Video (MP4)"}</span>
                     </div>
                     <Download className="w-4 h-4 animate-bounce" />
                   </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/privacy" },
   title: "Privacy Policy",
   description: "Privacy Policy of Reelser - How we protect your data.",
 };
@@ -13,30 +14,30 @@ export default function PrivacyPage() {
 
       <div className="prose prose-pink max-w-none text-gray-700 space-y-6 text-sm sm:text-base leading-relaxed">
         <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">1. No Personal Information Collected</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">1. Information Used to Process Requests</h2>
           <p>
-            Reelser does not require user registration, login credentials, or personal identification. We do not ask for or store Instagram usernames, passwords, or personal details.
+            Reelser does not ask for Instagram passwords or require visitor registration. Submitted links and usernames are sent to Instagram and public extraction services to retrieve media. Temporary media links are stored for up to 15 minutes and expired entries are removed during subsequent requests.
           </p>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-gray-900 mb-2">2. No Media Retention</h2>
           <p>
-            Reelser does not store, archive, or retain copies of downloaded videos, reels, stories, or photos on our servers. Media streams are processed transiently in real time and passed directly to your client browser.
+            Media is buffered temporarily to validate its type and size. Audio conversion uses a temporary local file that is removed after processing. Process crashes can leave temporary files for the hosting operator to clean up. We do not maintain a media archive.
           </p>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-gray-900 mb-2">3. Logs & Analytics</h2>
           <p>
-            Like standard web services, our servers may collect non-personally identifiable technical logs (such as browser user agent, IP address for rate limiting, and timestamp) strictly to prevent abuse and maintain server availability.
+            The application stores aggregate request counts and the latest 30 generic activity events without submitted usernames or titles. Rate limits use hashed client identifiers when a trusted proxy is configured; expired counters are removed on subsequent requests. Hosting providers may maintain their own access logs. Google Analytics is not loaded by the application. Configured advertisements may contact third-party providers from isolated frames.
           </p>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-gray-900 mb-2">4. Cookies</h2>
           <p>
-            We may use minimal local storage cookies solely to remember your preferred language selection across visits.
+            Your language preference is stored locally in your browser. Administrators receive a secure session cookie that expires after one day; sessions are revoked on logout or password change.
           </p>
         </section>
       </div>

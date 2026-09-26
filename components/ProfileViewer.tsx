@@ -1,7 +1,8 @@
 "use client";
 
+import { saveMedia } from "@/lib/downloadClient";
 import React, { useState, useEffect, useRef } from "react";
-import { ProfileData, ProfileMediaItem, MediaResult } from "@/lib/instagramExtractor";
+import { ProfileData } from "@/lib/instagramExtractor";
 import { useLanguage } from "./LanguageProvider";
 import {
   Download,
@@ -11,176 +12,90 @@ import {
   X,
   Play,
   Film,
-  Image as ImageIcon,
   Heart,
   MessageCircle,
   Clock,
   Sparkles,
   Layers,
-  Eye,
   Video,
 } from "lucide-react";
 
 interface ProfileViewerProps {
   profile: ProfileData;
-  media: MediaResult;
 }
 
-export function ProfileViewer({ profile, media }: ProfileViewerProps) {
+export function ProfileViewer({ profile }: ProfileViewerProps) {
   const { t, isRtl } = useLanguage();
   const [activeTab, setActiveTab] = useState<"posts" | "stories" | "highlights" | "reels">(
     profile.stories.length > 0 ? "stories" : "posts"
   );
-  const [postsDisplayed, setPostsDisplayed] = useState<ProfileMediaItem[]>([]);
-  const [reelsDisplayed, setReelsDisplayed] = useState<ProfileMediaItem[]>([]);
-  const [postsIndex, setPostsIndex] = useState(0);
-  const [reelsIndex, setReelsIndex] = useState(0);
-  const [loadingPosts, setLoadingPosts] = useState(false);
-  const [loadingReels, setLoadingReels] = useState(false);
-  const [postsCursor, setPostsCursor] = useState<string | undefined>(undefined);
-  const [reelsCursor, setReelsCursor] = useState<string | undefined>(undefined);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [zoomModalOpen, setZoomModalOpen] = useState(false);
+  const [postsLimit, setPostsLimit] = useState(12);
+  const [reelsLimit, setReelsLimit] = useState(12);
   const loadMorePostsRef = useRef<HTMLDivElement>(null);
   const loadMoreReelsRef = useRef<HTMLDivElement>(null);
+  const postsDisplayed = profile.posts.slice(0, postsLimit);
+  const reelsDisplayed = profile.reels.slice(0, reelsLimit);
+  const hasMorePosts = postsLimit < profile.posts.length;
+  const hasMoreReels = reelsLimit < profile.reels.length;
 
-  // Initialize displayed items
+  // The provider returns a finite batch without continuation cursors.
+  // Reveal that batch progressively instead of requesting a nonexistent endpoint.
   useEffect(() => {
-    // show first batch (12) for posts and reels
-    const initialBatch = 12;
-    setPostsDisplayed(profile.posts.slice(0, initialBatch));
-    setPostsIndex(initialBatch);
-    setReelsDisplayed(profile.reels.slice(0, initialBatch));
-    setReelsIndex(initialBatch);
-  }, [profile.posts, profile.reels]);
-
-  // Intersection observers for infinite scroll
-  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const target = activeTab === "posts" ? loadMorePostsRef.current
+      : activeTab === "reels" ? loadMoreReelsRef.current : null;
+    if (!target) return;
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          if (entry.target === loadMorePostsRef.current) {
-            loadMorePosts();
-          } else if (entry.target === loadMoreReelsRef.current) {
-            loadMoreReels();
-          }
-        }
-      });
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      if (activeTab === "posts") {
+        setPostsLimit(limit => Math.min(limit + 12, profile.posts.length));
+      } else {
+        setReelsLimit(limit => Math.min(limit + 12, profile.reels.length));
+      }
     }, { rootMargin: "200px" });
-    if (loadMorePostsRef.current) observer.observe(loadMorePostsRef.current);
-    if (loadMoreReelsRef.current) observer.observe(loadMoreReelsRef.current);
+    observer.observe(target);
     return () => observer.disconnect();
-  }, [loadMorePostsRef, loadMoreReelsRef, postsIndex, reelsIndex, profile.posts, profile.reels]);
+  }, [activeTab, postsLimit, reelsLimit, profile.posts.length, profile.reels.length]);
 
-  const loadMorePosts = async () => {
-    if (loadingPosts) return;
-    // Stop if no more items and no cursor
-    if (!postsCursor && postsIndex >= profile.posts.length) return;
-    setLoadingPosts(true);
-    try {
-      const res = await fetch(
-        `/api/load-more?username=${encodeURIComponent(profile.username)}&type=posts${postsCursor ? `&cursor=${encodeURIComponent(postsCursor)}` : ''}`
-      );
-      if (!res.ok) throw new Error('Failed to load more posts');
-      const data: { items: any[]; nextCursor?: string } = await res.json();
-      setPostsDisplayed(prev => [...prev, ...data.items]);
-      setPostsIndex(prev => prev + data.items.length);
-      setPostsCursor(data.nextCursor);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingPosts(false);
-    }
-  };
-
-  const loadMoreReels = async () => {
-    if (loadingReels) return;
-    if (!reelsCursor && reelsIndex >= profile.reels.length) return;
-    setLoadingReels(true);
-    try {
-      const res = await fetch(
-        `/api/load-more?username=${encodeURIComponent(profile.username)}&type=reels${reelsCursor ? `&cursor=${encodeURIComponent(reelsCursor)}` : ''}`
-      );
-      if (!res.ok) throw new Error('Failed to load more reels');
-      const data: { items: any[]; nextCursor?: string } = await res.json();
-      setReelsDisplayed(prev => [...prev, ...data.items]);
-      setReelsIndex(prev => prev + data.items.length);
-      setReelsCursor(data.nextCursor);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingReels(false);
-    }
-  };
+  useEffect(() => {
+    if (!zoomModalOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLButtonElement>("button")?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setZoomModalOpen(false);
+      if (event.key === "Tab" && dialog) {
+        const buttons = [...dialog.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => { document.removeEventListener("keydown", closeOnEscape); previous?.focus(); };
+  }, [zoomModalOpen]);
 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const handleDownload = (downloadUrl: string, filename: string, ext = "jpg") => {
+  const handleDownload = async (downloadUrl: string, filename: string, _ext = "jpg") => {
+    setDownloadError(null);
     setDownloadingId(downloadUrl);
-    const proxyUrl = `/api/download?url=${encodeURIComponent(downloadUrl)}&title=${encodeURIComponent(
-      filename
-    )}&ext=${ext}`;
-
-    const link = document.createElement("a");
-    link.href = proxyUrl;
-    link.download = `${filename}.${ext}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setTimeout(() => {
-      setDownloadingId(null);
-    }, 2000);
+    try { await saveMedia(downloadUrl, `${filename}.${_ext}`); }
+    catch (error) { setDownloadError(error instanceof Error ? error.message : "Download failed"); }
+    finally { setDownloadingId(null); }
   };
-
-  // Sample/fallback representations if account has no public items in initial SSR
-  const samplePosts: ProfileMediaItem[] = profile.posts.length > 0 ? profile.posts : [
-    {
-      id: "post-1",
-      type: "image",
-      thumbnail: profile.avatarUrl,
-      downloadUrl: profile.hdAvatarUrl,
-      caption: `${profile.fullName} (@${profile.username}) Featured Media & Photography`,
-      likes: "426K",
-      comments: "2.8K",
-      timestamp: "1 month ago",
-      isVideo: false,
-    },
-    {
-      id: "post-2",
-      type: "image",
-      thumbnail: profile.avatarUrl,
-      downloadUrl: profile.hdAvatarUrl,
-      caption: `High Resolution Portrait & Moments • @${profile.username}`,
-      likes: "598K",
-      comments: "3.4K",
-      timestamp: "3 months ago",
-      isVideo: false,
-    },
-    {
-      id: "post-3",
-      type: "image",
-      thumbnail: profile.avatarUrl,
-      downloadUrl: profile.hdAvatarUrl,
-      caption: `Official Creator Photography & Updates • @${profile.username}`,
-      likes: "125K",
-      comments: "6.1K",
-      timestamp: "5 months ago",
-      isVideo: false,
-    },
-  ];
-
-  const sampleHighlights = profile.highlights.length > 0 ? profile.highlights : [
-    { id: "h-1", title: "Highlights ✨", cover: profile.avatarUrl },
-    { id: "h-2", title: "Memories 📸", cover: profile.avatarUrl },
-    { id: "h-3", title: "Reels & Life 🌿", cover: profile.avatarUrl },
-    { id: "h-4", title: "Travel ✈️", cover: profile.avatarUrl },
-  ];
 
   return (
     <div className="w-full max-w-4xl mx-auto mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 text-left" dir={isRtl ? "rtl" : "ltr"}>
+      {downloadError && <p role="alert" className="text-red-700 text-center">{downloadError}</p>}
       {/* Title */}
       <div className="text-center">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-          {isRtl ? "نتيجة البحث عن الحساب" : "Search result"}
+          {t("Search result")}
         </h2>
       </div>
 
@@ -188,7 +103,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
       <div className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 md:gap-8">
           {/* Avatar with Zoom button */}
-          <div className="relative shrink-0 group cursor-pointer" onClick={() => setZoomModalOpen(true)}>
+          <div className="relative shrink-0 group">
             <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-lg group-hover:scale-105 transition-transform duration-300">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -198,7 +113,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 className="w-full h-full rounded-full object-cover bg-gray-100"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
+                    "/icon.svg";
                 }}
               />
             </div>
@@ -206,7 +121,8 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
             {/* Expand / Zoom Button */}
             <button
               type="button"
-              title={isRtl ? "تكبير وعرض الصورة" : "Zoom avatar"}
+              title={t("Zoom avatar")}
+              onClick={() => setZoomModalOpen(true)}
               className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-[#00d084] text-white flex items-center justify-center shadow-md hover:bg-emerald-600 transition-colors border-2 border-white cursor-pointer"
             >
               <Maximize2 className="w-4 h-4" />
@@ -227,7 +143,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 href={`https://www.instagram.com/${profile.username}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                title={isRtl ? "فتح الحساب في إنستغرام" : "Open in Instagram"}
+                title={t("Open in Instagram")}
                 className="text-gray-400 hover:text-pink-600 transition-colors p-1"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -240,19 +156,19 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 <span className="font-extrabold text-base text-gray-900 block">
                   {profile.postsCount}
                 </span>
-                <span className="text-xs text-gray-500">{isRtl ? "منشور" : "posts"}</span>
+                <span className="text-xs text-gray-500">{t("posts")}</span>
               </div>
               <div>
                 <span className="font-extrabold text-base text-gray-900 block">
                   {profile.followersCount}
                 </span>
-                <span className="text-xs text-gray-500">{isRtl ? "متابع" : "followers"}</span>
+                <span className="text-xs text-gray-500">{t("followers")}</span>
               </div>
               <div>
                 <span className="font-extrabold text-base text-gray-900 block">
                   {profile.followingCount}
                 </span>
-                <span className="text-xs text-gray-500">{isRtl ? "يتابع" : "following"}</span>
+                <span className="text-xs text-gray-500">{t("following")}</span>
               </div>
             </div>
 
@@ -272,19 +188,19 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 type="button"
                 onClick={() =>
                   handleDownload(
-                    profile.hdAvatarUrl,
+                    profile.avatarDownloadUrl || "",
                     `${profile.username}_avatar_hd`,
                     "jpg"
                   )
                 }
-                disabled={downloadingId === profile.hdAvatarUrl}
+                disabled={!profile.avatarDownloadUrl || downloadingId === profile.avatarDownloadUrl}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-[#00d084] hover:bg-emerald-600 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>
-                  {downloadingId === profile.hdAvatarUrl
-                    ? (isRtl ? "جاري التحميل..." : "Downloading...")
-                    : (isRtl ? "تحميل الصورة الشخصية (Full HD)" : "Download Profile DP (Full HD)")}
+                  {downloadingId === profile.avatarDownloadUrl
+                    ? (t("Downloading..."))
+                    : (t("Download Profile DP (Original)"))}
                 </span>
               </button>
 
@@ -294,7 +210,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
-                <span>{isRtl ? "تكبير الصورة" : "Zoom Avatar"}</span>
+                <span>{t("Zoom Avatar")}</span>
               </button>
             </div>
           </div>
@@ -303,19 +219,19 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
         {/* ================= INTERACTIVE 4 SUB-TABS ================= */}
         <div className="mt-8 border-t border-gray-100 pt-4">
           <div className="flex items-center justify-around sm:justify-center sm:gap-12">
-            {[
-              { id: "posts", label: isRtl ? "المنشورات (POSTS)" : "POSTS", icon: Layers },
-              { id: "stories", label: isRtl ? "الستوري (STORIES)" : "STORIES", icon: Clock },
-              { id: "highlights", label: isRtl ? "الهايلايت (HIGHLIGHTS)" : "HIGHLIGHTS", icon: Sparkles },
-              { id: "reels", label: isRtl ? "الريلز (REELS)" : "REELS", icon: Video },
-            ].map((tab) => {
+            {([
+              { id: "posts", label: t("POSTS"), icon: Layers },
+              { id: "stories", label: t("tabStory"), icon: Clock },
+              { id: "highlights", label: t("HIGHLIGHTS"), icon: Sparkles },
+              { id: "reels", label: t("tabReels"), icon: Video },
+            ] as const).map((tab) => {
               const Icon = tab.icon;
               const isSelected = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 py-3 px-3 sm:px-5 font-black text-xs sm:text-sm uppercase tracking-wider transition-all border-b-2 cursor-pointer ${
                     isSelected
                       ? "border-gray-900 text-gray-900"
@@ -394,8 +310,8 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                       <Download className="w-4 h-4" />
                       <span>
                         {downloadingId === item.downloadUrl
-                          ? (isRtl ? "جاري التحميل..." : "Downloading...")
-                          : (isRtl ? "تحميل (Download)" : "Download")}
+                          ? (t("Downloading..."))
+                          : (t("btnDownload"))}
                       </span>
                     </button>
                   </div>
@@ -403,7 +319,12 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
               </div>
             ))}
             </div>
-            <div ref={loadMorePostsRef} />
+            {hasMorePosts && <div ref={loadMorePostsRef} className="text-center">
+              <button type="button" onClick={() => setPostsLimit(limit => limit + 12)} className="px-4 py-2 rounded-xl bg-gray-100 font-bold">
+                {t("Show more")}
+              </button>
+            </div>}
+            {profile.posts.length === 0 && <p className="text-center text-gray-500 py-8">{t("No posts available to display.")}</p>}
           </div>
       )}
 
@@ -450,7 +371,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                       className="w-full py-2.5 px-4 rounded-xl font-black text-xs text-white bg-[#00d084] hover:bg-emerald-600 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
-                      <span>{isRtl ? "تحميل الستوري" : "Download"}</span>
+                      <span>{t("btnDownload")}</span>
                     </button>
                   </div>
                 </div>
@@ -462,12 +383,10 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 <Clock className="w-8 h-8" />
               </div>
               <h3 className="text-lg font-bold text-gray-900">
-                {isRtl ? "لا توجد قصص نشطة حالياً" : "No Active Stories Right Now"}
+                {t("No Active Stories Right Now")}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-                {isRtl
-                  ? "الحساب لم ينشر أي ستوري جديدة خلال الـ 24 ساعة الماضية، أو انتهت مدة عرض القصص السابقة (Stories expire after 24h)."
-                  : "This account has not posted any new stories in the past 24 hours, or the stories have expired."}
+                {t("No stories were available from the source. They may have expired or could not be retrieved.")}
               </p>
               <div className="pt-2 flex justify-center gap-3">
                 <button
@@ -475,14 +394,14 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                   onClick={() => setActiveTab("posts")}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
                 >
-                  {isRtl ? "عرض المنشورات" : "View Posts"}
+                  {t("View Posts")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("reels")}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-pink-700 bg-pink-50 hover:bg-pink-100 transition-colors cursor-pointer"
                 >
-                  {isRtl ? "عرض مقاطع الريلز" : "View Reels"}
+                  {t("View Reels")}
                 </button>
               </div>
             </div>
@@ -495,11 +414,12 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
         <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-6 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>{isRtl ? "ألبومات الهايلايت المحفوظة" : "Story Highlights"}</span>
+            <span>{t("Story Highlights")}</span>
           </h3>
 
           <div className="flex items-center gap-6 overflow-x-auto pb-4 justify-start sm:justify-center">
-            {sampleHighlights.map((hl) => (
+            {profile.highlights.length === 0 && <p className="text-center text-gray-500">{t("No highlights available to display.")}</p>}
+            {profile.highlights.map((hl) => (
               <div
                 key={hl.id}
                 onClick={() =>
@@ -524,7 +444,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                   {hl.title}
                 </span>
                 <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Download className="w-3 h-3" /> Download
+                  <Download className="w-3 h-3" /> {t("btnDownload")}
                 </span>
               </div>
             ))}
@@ -553,7 +473,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                   <div className="absolute top-3 right-3">
                     <span className="p-1.5 rounded-lg bg-black/60 text-white backdrop-blur-xs flex items-center gap-1">
                       <Film className="w-3.5 h-3.5 fill-white" />
-                      <span className="text-[10px] font-mono">1080p</span>
+                      <span className="text-[10px] font-mono">MP4</span>
                     </span>
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -571,7 +491,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
 
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold pt-1 border-t border-gray-50">
-                      <span>{item.likes} views</span>
+                      <span>{item.likes ? `${item.likes} ${t("likes")}` : ""}</span>
                       <span className="text-gray-400">{item.timestamp}</span>
                     </div>
 
@@ -587,20 +507,25 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                       className="w-full py-2.5 px-4 rounded-xl font-black text-xs text-white bg-[#00d084] hover:bg-emerald-600 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
-                      <span>{isRtl ? "تحميل ريلز MP4" : "Download"}</span>
+                      <span>{t("btnDownload")}</span>
                     </button>
                   </div>
                 </div>
               </div>
             ))}
             </div>
-            <div ref={loadMoreReelsRef} />
+            {hasMoreReels && <div ref={loadMoreReelsRef} className="text-center">
+              <button type="button" onClick={() => setReelsLimit(limit => limit + 12)} className="px-4 py-2 rounded-xl bg-gray-100 font-bold">
+                {t("Show more")}
+              </button>
+            </div>}
+            {profile.reels.length === 0 && <p className="text-center text-gray-500 py-8">{t("No reels available to display.")}</p>}
         </div>
       )}
 
       {/* ================= AVATAR ZOOM MODAL ================= */}
       {zoomModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Profile picture")} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div
             className="fixed inset-0"
             onClick={() => setZoomModalOpen(false)}
@@ -610,6 +535,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
             <button
               type="button"
               onClick={() => setZoomModalOpen(false)}
+              aria-label={t("Close")}
               className="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -629,28 +555,29 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
+                    "/icon.svg";
                 }}
               />
             </div>
 
             <p className="text-xs text-gray-500 font-medium">
-              {isRtl ? "صورة البروفايل بأعلى دقة متوفرة (Full HD)" : "Highest resolution profile picture (Full HD)"}
+              {t("Highest resolution profile picture (Original)")}
             </p>
 
             <button
               type="button"
               onClick={() =>
                 handleDownload(
-                  profile.hdAvatarUrl,
+                  profile.avatarDownloadUrl || "",
                   `${profile.username}_avatar_original`,
                   "jpg"
                 )
               }
+              disabled={!profile.avatarDownloadUrl || downloadingId !== null}
               className="w-full py-3 px-4 rounded-xl font-bold text-sm text-white bg-[#00d084] hover:bg-emerald-600 shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
             >
               <Download className="w-4 h-4" />
-              <span>{isRtl ? "تحميل الصورة بجودة كاملة" : "Download Full HD Avatar"}</span>
+              <span>{t("Download Original Avatar")}</span>
             </button>
           </div>
         </div>

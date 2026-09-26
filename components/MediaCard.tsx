@@ -1,8 +1,9 @@
 "use client";
 
+import { saveMedia } from "@/lib/downloadClient";
 import React, { useState } from "react";
 import { MediaResult, MediaFormat } from "@/lib/instagramExtractor";
-import { Download, Film, Music, Image as ImageIcon, Check, ExternalLink, Play } from "lucide-react";
+import { Download, Film, Music, Image as ImageIcon, Check } from "lucide-react";
 import { useLanguage } from "./LanguageProvider";
 import { ProfileViewer } from "./ProfileViewer";
 
@@ -12,11 +13,12 @@ interface MediaCardProps {
 
 export function MediaCard({ media }: MediaCardProps) {
   const { t } = useLanguage();
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadingFormatId, setDownloadingFormatId] = useState<string | null>(null);
 
   // If the result is a full Instagram profile, render the StoriesIG Profile Viewer experience
   if (media.isProfile && media.profileData) {
-    return <ProfileViewer profile={media.profileData} media={media} />;
+    return <ProfileViewer key={media.profileData.username} profile={media.profileData} />;
   }
 
   const getFormatIcon = (type: MediaFormat["type"]) => {
@@ -32,28 +34,17 @@ export function MediaCard({ media }: MediaCardProps) {
     }
   };
 
-  const handleDownload = (format: MediaFormat) => {
+  const handleDownload = async (format: MediaFormat) => {
+    setDownloadError(null);
     setDownloadingFormatId(format.formatId);
-
-    // Build the proxy download URL
-    const proxyUrl = `/api/download?url=${encodeURIComponent(format.downloadUrl)}&title=${encodeURIComponent(
-      media.title || "instagram-media"
-    )}&ext=${format.ext}`;
-
-    const link = document.createElement("a");
-    link.href = proxyUrl;
-    link.download = `${media.title || "instagram-reelser"}.${format.ext}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setTimeout(() => {
-      setDownloadingFormatId(null);
-    }, 2000);
+    try { await saveMedia(format.downloadUrl, media.title || "reelser-media"); }
+    catch (error) { setDownloadError(error instanceof Error ? error.message : "Download failed"); }
+    finally { setDownloadingFormatId(null); }
   };
 
   return (
     <div className="w-full max-w-3xl mx-auto mt-8 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {downloadError && <p role="alert" className="text-red-700 p-4">{downloadError}</p>}
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row gap-6 items-start">
           {/* Thumbnail / Preview Area */}
@@ -86,20 +77,20 @@ export function MediaCard({ media }: MediaCardProps) {
           <div className="flex-1 w-full flex flex-col justify-between">
             <div>
               <span className="inline-block px-2.5 py-0.5 text-xs font-semibold text-pink-600 bg-pink-50 rounded-full mb-2">
-                ✓ Ready for Download
+                ✓ {t("Ready for Download")}
               </span>
               <h3 className="text-lg md:text-xl font-bold text-gray-900 leading-snug line-clamp-2">
                 {media.title}
               </h3>
               <p className="text-xs text-gray-600 mt-1">
-                Source: <span className="font-semibold text-gray-700">{media.author}</span>
+                {t("Source")}: <span className="font-semibold text-gray-700">{media.author}</span>
               </p>
             </div>
 
             {/* Formats list */}
             <div className="mt-5 space-y-2.5">
               <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                Available Downloads ({media.formats.length})
+                {t("Available Downloads")} ({media.formats.length})
               </h4>
               {media.formats.map((fmt) => {
                 const isDownloading = downloadingFormatId === fmt.formatId;
@@ -114,14 +105,11 @@ export function MediaCard({ media }: MediaCardProps) {
                       </div>
                       <div>
                         <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                          <span>{fmt.quality}</span>
+                          <span>{fmt.ext.toUpperCase()}</span>
                           <span className="text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded bg-gray-200 text-gray-700">
                             .{fmt.ext}
                           </span>
                         </div>
-                        {fmt.note && (
-                          <div className="text-xs text-gray-600">{fmt.note}</div>
-                        )}
                       </div>
                     </div>
 
@@ -133,7 +121,7 @@ export function MediaCard({ media }: MediaCardProps) {
                       {isDownloading ? (
                         <>
                           <Check className="w-4 h-4 animate-bounce" />
-                          <span>Starting...</span>
+                          <span>{t("Downloading...")}</span>
                         </>
                       ) : (
                         <>

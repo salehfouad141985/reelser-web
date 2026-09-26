@@ -17,22 +17,6 @@ export function FaqSection() {
       q: t("faq2Q"),
       a: t("faq2A"),
     },
-    {
-      q: "Can I download Instagram Reels with audio in original quality?",
-      a: "Yes! Reelser preserves the full audio track synchronized with the high-definition 1080p MP4 video. You can also extract and download the audio track as an MP3 file.",
-    },
-    {
-      q: "Does Reelser work with private Instagram accounts?",
-      a: "Due to Instagram's privacy policy and copyright terms, Reelser only downloads media from public Instagram accounts and publicly accessible Reels or Stories.",
-    },
-    {
-      q: "Where are the downloaded Instagram videos saved?",
-      a: "On iPhone / iPad, videos are saved directly to your Downloads folder or Photos app via Safari. On Android and PC/Mac, files are stored in your default 'Downloads' folder.",
-    },
-    {
-      q: "Is there a watermark added to the downloaded videos?",
-      a: "No! Reelser downloads the pure, clean source video exactly as uploaded, completely free of any additional watermarks or logos.",
-    },
   ];
 
   const faqSchema = {

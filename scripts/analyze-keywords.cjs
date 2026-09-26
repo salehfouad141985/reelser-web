@@ -1,8 +1,11 @@
 const fs = require('fs');
 
-const file = 'C:/Users/saleh14/.gemini/antigravity/brain/6c8c14fc-84b9-4e5a-b259-254150f890b9/.user_uploaded/media_1790331000083.csv';
+const file = process.argv[2];
+if (!file || !fs.existsSync(file)) { console.error("Usage: node " + process.argv[1] + " <keyword-export.tsv> [utf8|utf16le]"); process.exit(1); }
 const buffer = fs.readFileSync(file);
-const text = buffer.toString('utf16le');
+const encoding = process.argv[3] || (buffer[0] === 255 && buffer[1] === 254 ? "utf16le" : "utf8");
+if (!["utf8", "utf16le"].includes(encoding)) throw new Error("Unsupported encoding");
+const text = buffer.toString(encoding).replace(/^\uFEFF/, "");
 const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
 const keywords = [];

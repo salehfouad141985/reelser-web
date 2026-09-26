@@ -1,4 +1,3 @@
-const fs = require('fs');
 
 const INDEXNOW_KEY = "d2d6601146b940e29a2a0a7337c93bbb";
 const HOST = "reelser.com";

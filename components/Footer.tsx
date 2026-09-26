@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useLanguage } from "./LanguageProvider";
-import { Video, Heart, ExternalLink, ShieldCheck } from "lucide-react";
+import { Video, ExternalLink, ShieldCheck } from "lucide-react";
 
 export function Footer() {
   const { t } = useLanguage();
@@ -24,7 +24,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-xs leading-relaxed text-gray-400">
-              The world&apos;s leading fast & free Instagram media downloader. Save Reels, Stories, Photos, and Audio in pristine HD 1080p without watermark.
+              The world&apos;s leading fast & free Instagram media downloader. Save Reels, Stories, Photos, and Audio in available quality without watermark.
             </p>
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />

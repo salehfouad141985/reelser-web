@@ -1,56 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  verifyAdminToken,
-  updateAdminSettings,
-  updateAdminPassword,
-} from "@/lib/adminStore";
-
+import { verifyAdminToken, updateAdminSettings, updateAdminPassword, type AdminSettings } from "@/lib/adminStore";
+import { assertSameOrigin, errorResponse, readJson, RequestError } from "@/lib/requestPolicy";
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get("reelser_admin_session")?.value;
-  if (!token || !verifyAdminToken(token)) {
-    return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
-  }
-
   try {
-    const body = await req.json();
-
-    // Check if updating password
+    assertSameOrigin(req);
+    const token = req.cookies.get("reelser_admin_session")?.value;
+    if (!token || !verifyAdminToken(token)) throw new RequestError("غير مصرح", 401);
+    const body = await readJson(req);
     if (body.action === "change_password") {
-      const { newPassword } = body;
-      if (!newPassword || newPassword.length < 6) {
-        return NextResponse.json(
-          { success: false, error: "كلمة المرور يجب أن لا تقل عن 6 أحرف" },
-          { status: 400 }
-        );
-      }
-      const updated = updateAdminPassword(newPassword);
-      return NextResponse.json({
-        success: updated,
-        message: updated ? "تم تغيير كلمة المرور بنجاح" : "تعذر تغيير كلمة المرور",
-      });
+      if (typeof body.newPassword !== "string" || !updateAdminPassword(body.newPassword)) throw new RequestError("كلمة المرور يجب أن تكون بين 16 و1024 حرفاً");
+      const response = NextResponse.json({ success: true, message: "تم تغيير كلمة المرور. سجّل الدخول مجدداً." });
+      response.cookies.delete("reelser_admin_session");
+      return response;
     }
-
-    // Otherwise update settings
-    const updatedSettings = updateAdminSettings({
-      maintenance_mode: Boolean(body.maintenance_mode),
-      ad_top_banner_enabled: Boolean(body.ad_top_banner_enabled),
-      ad_top_banner_code: String(body.ad_top_banner_code || ""),
-      ad_results_banner_enabled: Boolean(body.ad_results_banner_enabled),
-      ad_results_banner_code: String(body.ad_results_banner_code || ""),
-      ad_bottom_banner_enabled: Boolean(body.ad_bottom_banner_enabled),
-      ad_bottom_banner_code: String(body.ad_bottom_banner_code || ""),
-      max_downloads_per_ip_hour: Number(body.max_downloads_per_ip_hour) || 60,
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "تم حفظ الإعدادات بنجاح",
-      settings: updatedSettings,
-    });
-  } catch (err) {
-    return NextResponse.json(
-      { success: false, error: "حدث خطأ أثناء حفظ الإعدادات" },
-      { status: 500 }
-    );
-  }
+    const update: Partial<AdminSettings> = {};
+    for (const key of ["maintenance_mode", "ad_top_banner_enabled", "ad_results_banner_enabled", "ad_bottom_banner_enabled"] as const) {
+      if (key in body) { if (typeof body[key] !== "boolean") throw new RequestError("Invalid setting"); update[key] = body[key]; }
+    }
+    for (const key of ["ad_top_banner_code", "ad_results_banner_code", "ad_bottom_banner_code"] as const) {
+      if (key in body) { if (typeof body[key] !== "string" || body[key].length > 8000) throw new RequestError("Invalid banner"); update[key] = body[key]; }
+    }
+    if ("max_downloads_per_ip_hour" in body) {
+      const value = body.max_downloads_per_ip_hour;
+      if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 600) throw new RequestError("Download limit must be between 1 and 600");
+      update.max_downloads_per_ip_hour = value;
+    }
+    const settings = updateAdminSettings(update);
+    return NextResponse.json({ success: true, message: "تم حفظ الإعدادات", settings });
+  } catch (error) { return errorResponse(error); }
 }

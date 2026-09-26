@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useLanguage } from "./LanguageProvider";
-import { ShieldCheck, Sparkles, Zap, Smartphone, CheckCircle, Video } from "lucide-react";
+import { ShieldCheck, Sparkles, Zap, Smartphone } from "lucide-react";
 
 export function FeaturesSection() {
   const { t } = useLanguage();

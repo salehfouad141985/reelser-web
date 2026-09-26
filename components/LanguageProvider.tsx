@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useSyncExternalStore, useEffect } from "react";
+import { UI_TEXT } from "@/lib/uiText";
 import { Locale, AVAILABLE_LOCALES, TRANSLATIONS, LocaleInfo } from "@/lib/i18n";
 
 interface LanguageContextType {
@@ -19,31 +20,23 @@ const LanguageContext = createContext<LanguageContextType>({
   isRtl: false,
 });
 
+function readLocale(): Locale {
+  let saved: string | null = null;
+  try { saved = localStorage.getItem("reelser_locale"); } catch {}
+  const candidate = saved || navigator.language.slice(0, 2).toLowerCase();
+  return AVAILABLE_LOCALES.some(item => item.code === candidate) ? candidate as Locale : "en";
+}
+function subscribeLocale(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener("reelser-locale", listener);
+  return () => { window.removeEventListener("storage", listener); window.removeEventListener("reelser-locale", listener); };
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
-
-  useEffect(() => {
-    // Detect stored language or browser language
-    const saved = localStorage.getItem("reelser_locale") as Locale | null;
-    if (saved && AVAILABLE_LOCALES.some((l) => l.code === saved)) {
-      setLocaleState(saved);
-      return;
-    }
-
-    const browserLang = navigator.language.slice(0, 2).toLowerCase() as Locale;
-    if (AVAILABLE_LOCALES.some((l) => l.code === browserLang)) {
-      setLocaleState(browserLang);
-    }
-  }, []);
-
-  const setLocale = (newLocale: Locale) => {
-    setLocaleState(newLocale);
-    localStorage.setItem("reelser_locale", newLocale);
-    const info = AVAILABLE_LOCALES.find((l) => l.code === newLocale);
-    if (info) {
-      document.documentElement.lang = info.code;
-      document.documentElement.dir = info.dir;
-    }
+  const locale = useSyncExternalStore(subscribeLocale, readLocale, () => "en" as Locale);
+  const setLocale = (next: Locale) => {
+    try { localStorage.setItem("reelser_locale", next); } catch {}
+    window.dispatchEvent(new Event("reelser-locale"));
   };
 
   useEffect(() => {
@@ -57,6 +50,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const isRtl = currentLocaleInfo.dir === "rtl";
 
   const t = (key: string): string => {
+    if (key === "faq1A") return UI_TEXT[locale]["Free with usage limits to keep the service available."];
+    if (UI_TEXT[locale][key]) return UI_TEXT[locale][key];
     const localeDict = TRANSLATIONS[locale] || TRANSLATIONS.en;
     if (localeDict && localeDict[key]) return localeDict[key];
     const enDict = TRANSLATIONS.en;

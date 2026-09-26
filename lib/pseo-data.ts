@@ -13,7 +13,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "download-instagram-reels": {
@@ -21,7 +21,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "reels-downloader": {
@@ -29,7 +29,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "save-instagram-reels": {
@@ -37,7 +37,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "instagram-reels-video-download": {
@@ -45,7 +45,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "instagram-reels-without-watermark": {
@@ -53,7 +53,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Downloader Without Watermark",
     metaTitle: "Instagram Downloader Without Watermark - Reelser",
-    metaDescription: "Save Instagram Reels and videos cleanly without any watermark or logo in 1080p Full HD.",
+    metaDescription: "Save Instagram Reels and videos cleanly without any watermark or logo in source quality.",
     keywords: ["instagram","instagram video download","ig","instagram video","reels download","download video ig","download instagram reels","download video ig tanpa watermark","save reel without watermark","download ins","download instagram video without watermark","download video ig tanpa watermark 2021","download video ig tanpa watermark 2022","gram video download","instagram reels download no watermark","instagram reels without watermark","instagram video download no watermark","instagram video without watermark","instagram video without watermark download"],
   },
   "instagram-reels-download-online": {
@@ -61,7 +61,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "reels-download-hd": {
@@ -69,7 +69,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "download-reels-by-link": {
@@ -77,7 +77,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "instagram-video-download": {
@@ -125,7 +125,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Downloader Without Watermark",
     metaTitle: "Instagram Downloader Without Watermark - Reelser",
-    metaDescription: "Save Instagram Reels and videos cleanly without any watermark or logo in 1080p Full HD.",
+    metaDescription: "Save Instagram Reels and videos cleanly without any watermark or logo in source quality.",
     keywords: ["instagram","instagram video download","ig","instagram video","reels download","download video ig","download instagram reels","download video ig tanpa watermark","save reel without watermark","download ins","download instagram video without watermark","download video ig tanpa watermark 2021","download video ig tanpa watermark 2022","gram video download","instagram reels download no watermark","instagram reels without watermark","instagram video download no watermark","instagram video without watermark","instagram video without watermark download"],
   },
   "instagram-to-mp4": {
@@ -253,7 +253,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "SaveInsta Alternative - Free Instagram Downloader",
     metaTitle: "SaveInsta Alternative - Free Instagram Downloader - Reelser",
-    metaDescription: "The best SaveInsta alternative. Download Instagram Reels, Stories, Photos, and Videos in Full HD.",
+    metaDescription: "The best SaveInsta alternative. Download Instagram Reels, Stories, Photos, and Videos in source quality.",
     keywords: ["save insta","saveinsta","save instagram reel to camera roll","app to save instagram videos","save instagram videos to camera roll","save instagram reels","saveinsta app","save instagram video to iphone","save instagram posts","save insta com","save instagram photos","save instagram video to phone","save insta net","save instagram story with music","save insta app","save instagram videos on iphone","save instagram reel without watermark","download and save instagram videos","dredown download save instagram photos videos and multiple posts feed","insave instagram","post save instagram","reel save instagram","save insta con","save insta download","save insta download reels","save insta dp","save insta hd","save insta reel video","save insta reels download","save insta story download"],
   },
   "ssinstagram-alternative": {
@@ -269,7 +269,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "SnapInsta Alternative - Fast Instagram Downloader",
     metaTitle: "SnapInsta Alternative - Fast Instagram Downloader - Reelser",
-    metaDescription: "High-speed SnapInsta alternative. Save Instagram Reels, Videos, Stories, and DP in 1080p MP4/JPG.",
+    metaDescription: "High-speed SnapInsta alternative. Save Instagram Reels, Videos, Stories, and DP in MP4/JPG.",
     keywords: ["snap insta","snap instagram","snap insta app","snapinsta download","snapinsta app download","download snap instagram","download snapinsta","https snapinsta app","insta video dow","instagram story download snapinsta","snap insta download","snap insta video download","snapinsta apk","snapinsta apk download","snapinsta app id","snapinsta app instagram downloader","snapinsta downloader","snapinsta instagram downloader","snapinsta story","snapinsta story download","snapinsta video download"],
   },
   "snaptik-instagram": {
@@ -277,7 +277,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "fastsave-instagram": {
@@ -285,7 +285,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
   "indown-alternative": {
@@ -293,7 +293,7 @@ export const REELSER_PSEO_PAGES: Record<string, PseoPageConfig> = {
     category: "reels",
     h1: "Instagram Reels Downloader",
     metaTitle: "Instagram Reels Downloader - Reelser",
-    metaDescription: "Download Instagram Reels in Full HD 1080p MP4 with original crystal-clear audio. Fast, free, and no watermark.",
+    metaDescription: "Download Instagram Reels in source quality MP4 with original crystal-clear audio. Fast, free, and no watermark.",
     keywords: ["instagram","ig","instagram reels download","reels download","save insta","reels downloader","download instagram reels","m instagram","for instagram","cara download reels ig","download reels instagram","download reels","instagram reels download app","reels video download","save instagram reels","app to download instagram reels","save reels ig","download ig reels","save reels to camera roll","download reels from instagram","instagram reels download apk","instagram reels video download","cara save reels ig","tiktok reels download","reels download app","save reels","download reels on instagram","instagram reels video download in gallery","save reels from instagram","apps to download instagram reels"],
   },
 };

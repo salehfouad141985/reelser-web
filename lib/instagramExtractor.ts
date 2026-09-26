@@ -1,3 +1,23 @@
+// Bounded source responses and real cancellation, including the response body.
+async function fetchSource(url: string, options: RequestInit): Promise<Response> {
+  const response = await fetch(url, { ...options, redirect: "error" });
+  if (!response.ok || !response.body) throw new Error("Source unavailable");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      options.signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > 2 * 1024 * 1024) { await reader.cancel(); throw new Error("Source response too large"); }
+      chunks.push(value);
+    }
+    return new Response(Buffer.concat(chunks), { status: response.status, headers: response.headers });
+  } finally { reader.releaseLock(); }
+}
+
 export interface MediaFormat {
   formatId: string;
   quality: string;
@@ -30,6 +50,7 @@ export interface ProfileData {
   fullName: string;
   avatarUrl: string;
   hdAvatarUrl: string;
+  avatarDownloadUrl?: string;
   postsCount: string;
   followersCount: string;
   followingCount: string;
@@ -63,6 +84,9 @@ export function extractInstagramShortcode(url: string): string | null {
 export function extractInstagramUsername(input: string): string | null {
   if (!input) return null;
   const trimmed = input.trim();
+  if (trimmed.includes("://")) {
+    try { const parsed = new URL(trimmed); if (parsed.protocol !== "https:" || !["instagram.com", "www.instagram.com"].includes(parsed.hostname) || parsed.username || parsed.password || parsed.port) return null; } catch { return null; }
+  }
 
   // If starts with @, e.g. @cristiano or @user.name
   if (trimmed.startsWith("@")) {
@@ -73,13 +97,13 @@ export function extractInstagramUsername(input: string): string | null {
   }
 
   // If story URL like instagram.com/stories/username/
-  const storyMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?instagram\.com\/stories\/([a-zA-Z0-9._]{1,30})\/?(?:\?.*)?$/i);
+  const storyMatch = trimmed.match(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\/stories\/([a-zA-Z0-9._]{1,30})\/?(?:\?.*)?$/i);
   if (storyMatch) {
     return storyMatch[1].toLowerCase();
   }
 
   // If profile URL like instagram.com/username or https://www.instagram.com/username/
-  const profileMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9._]{1,30})\/?(?:\?.*)?$/i);
+  const profileMatch = trimmed.match(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9._]{1,30})\/?(?:\?.*)?$/i);
   if (profileMatch) {
     const candidate = profileMatch[1].toLowerCase();
     const reserved = ["p", "reel", "reels", "tv", "stories", "share", "explore", "accounts", "direct", "about", "developer"];
@@ -99,7 +123,10 @@ export function extractInstagramUsername(input: string): string | null {
 export function isValidInstagramUrl(url: string): boolean {
   if (!url) return false;
   const trimmed = url.trim();
-  if (/https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|reels|tv|stories|share)\/([\w.-]+)/i.test(trimmed)) {
+  if (trimmed.includes("://")) {
+    try { const parsed = new URL(trimmed); if (parsed.protocol !== "https:" || !["instagram.com", "www.instagram.com"].includes(parsed.hostname) || parsed.username || parsed.password || parsed.port) return false; } catch { return false; }
+  }
+  if (/^https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|reels|tv|stories|share)\/([\w.-]+)/i.test(trimmed)) {
     return true;
   }
   if (extractInstagramUsername(trimmed) !== null) {
@@ -124,7 +151,7 @@ function decodeHtmlEntities(str: string): string {
 
 export function createFallbackProfileResult(username: string): MediaResult {
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
-  const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
+  const defaultAvatar = "/icon.svg";
 
   return {
     url: `https://www.instagram.com/${clean}/`,
@@ -132,22 +159,13 @@ export function createFallbackProfileResult(username: string): MediaResult {
     author: `@${clean}`,
     thumbnail: defaultAvatar,
     platform: "Instagram",
-    formats: [
-      {
-        formatId: "ig-avatar-hd",
-        quality: "Full HD Profile Picture (Original JPG)",
-        ext: "jpg",
-        type: "image",
-        downloadUrl: defaultAvatar,
-        note: `Profile avatar of @${clean}`,
-      },
-    ],
+    formats: [],
     isProfile: true,
     profileData: {
       username: clean,
       fullName: `@${clean}`,
       avatarUrl: defaultAvatar,
-      hdAvatarUrl: defaultAvatar,
+      hdAvatarUrl: "",
       postsCount: "0",
       followersCount: "Public",
       followingCount: "Instagram",
@@ -161,7 +179,7 @@ export function createFallbackProfileResult(username: string): MediaResult {
   };
 }
 
-async function fetchPublicProfileMetadata(username: string): Promise<{
+async function fetchPublicProfileMetadata(username: string, signal: AbortSignal): Promise<{
   username: string;
   fullName: string;
   avatarUrl: string;
@@ -176,12 +194,12 @@ async function fetchPublicProfileMetadata(username: string): Promise<{
   if (!clean) return null;
 
   try {
-    const res = await fetch(`https://insta-stories-viewer.com/${encodeURIComponent(clean)}/`, {
+    const res = await fetchSource(`https://insta-stories-viewer.com/${encodeURIComponent(clean)}/`, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(6000)]),
     });
 
     if (!res.ok) return null;
@@ -216,15 +234,12 @@ async function fetchPublicProfileMetadata(username: string): Promise<{
     }
 
     if (rawAvatar || followersCount) {
-      const proxiedAvatar = rawAvatar.startsWith("http")
-        ? `/api/proxy?url=${encodeURIComponent(rawAvatar)}`
-        : rawAvatar;
 
       return {
         username: clean,
         fullName: nickname,
-        avatarUrl: proxiedAvatar || rawAvatar,
-        hdAvatarUrl: proxiedAvatar || rawAvatar,
+        avatarUrl: rawAvatar,
+        hdAvatarUrl: rawAvatar,
         postsCount: exactPosts || postsCount || "0",
         followersCount: exactFollowers || followersCount || "Public",
         followingCount: exactFollowing || followingCount || "Instagram",
@@ -232,19 +247,19 @@ async function fetchPublicProfileMetadata(username: string): Promise<{
         isVerified,
       };
     }
-  } catch (err: any) {
-    console.warn("fetchPublicProfileMetadata error:", err?.message || err);
+  } catch {
+    console.warn("fetchPublicProfileMetadata error:");
   }
   return null;
 }
 
-export async function extractInstagramProfile(username: string): Promise<MediaResult | null> {
+export async function extractInstagramProfile(username: string, signal: AbortSignal = AbortSignal.timeout(10000)): Promise<MediaResult | null> {
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
   if (!clean) return null;
 
   try {
     // 1. Fetch public profile metadata from residential viewer mirror
-    const publicMetaPromise = fetchPublicProfileMetadata(clean);
+    const publicMetaPromise = fetchPublicProfileMetadata(clean, signal);
 
     // 2. Also attempt direct Instagram request (in case residential proxy / client IP is direct)
     const directPromise = (async () => {
@@ -263,10 +278,10 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
           "Upgrade-Insecure-Requests": "1",
         };
 
-        const res = await fetch(`https://www.instagram.com/${clean}/`, {
+        const res = await fetchSource(`https://www.instagram.com/${clean}/`, {
           headers: chromeHeaders,
           cache: "no-store",
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
         });
 
         if (!res.ok) return null;
@@ -356,11 +371,11 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
     const chosen = directMeta || publicMeta;
 
     if (!chosen) {
-      return createFallbackProfileResult(clean);
+      return null;
     }
 
     const fullName = directMeta?.fullName || publicMeta?.fullName || clean;
-    const avatarUrl = directMeta?.avatarUrl || publicMeta?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
+    const avatarUrl = directMeta?.avatarUrl || publicMeta?.avatarUrl || "/icon.svg";
     const hdAvatarUrl = directMeta?.hdAvatarUrl || publicMeta?.hdAvatarUrl || avatarUrl;
     const postsCount = publicMeta?.postsCount || directMeta?.postsCount || "0";
     const followersCount = publicMeta?.followersCount || directMeta?.followersCount || "Public";
@@ -368,16 +383,16 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
     const biography = publicMeta?.biography || directMeta?.biography || `Instagram Creator @${clean}`;
     const isVerified = Boolean(directMeta?.isVerified || publicMeta?.isVerified);
 
-    const formats: MediaFormat[] = [
+    const formats: MediaFormat[] = hdAvatarUrl && hdAvatarUrl !== "/icon.svg" ? [
       {
         formatId: "ig-avatar-hd",
-        quality: "Full HD Profile Picture (Original JPG)",
+        quality: "Profile picture (available quality)",
         ext: "jpg",
         type: "image",
         downloadUrl: hdAvatarUrl,
         note: `Profile avatar of @${clean}`,
       },
-    ];
+    ] : [];
 
     if (avatarUrl && avatarUrl !== hdAvatarUrl) {
       formats.push({
@@ -416,16 +431,17 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
       isProfile: true,
       profileData,
     };
-  } catch (err: any) {
-    console.warn("Instagram profile extraction error:", err?.message || err);
-    return createFallbackProfileResult(clean);
+  } catch {
+    console.warn("Instagram profile extraction error:");
+    return null;
   }
 }
 
 function decodeSnapApp(args: string[]): string {
-  const [h, u, n, t, e, r] = args;
+  const [h, , n, t, e] = args;
   const tNum = Number(t);
   const eNum = Number(e);
+  if (!Number.isFinite(tNum) || !Number.isInteger(eNum) || eNum < 2 || eNum > 36 || n.length > 64 || !n[eNum]) throw new Error("Invalid source encoding");
   function decode(d: string, e: number, f: number) {
     const g = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/".split("");
     const hArr = g.slice(0, e);
@@ -435,6 +451,7 @@ function decodeSnapApp(args: string[]): string {
       if (idx !== -1) return a + idx * Math.pow(e, c);
       return a;
     }, 0);
+    if (!Number.isFinite(j)) throw new Error("Invalid encoded value");
     let k = "";
     while (j > 0) {
       k = iArr[j % f] + k;
@@ -448,24 +465,29 @@ function decodeSnapApp(args: string[]): string {
     while (i < len && h[i] !== n[eNum]) {
       s += h[i];
       i++;
+      if (s.length > 32) throw new Error("Invalid encoded chunk");
     }
     i++;
-    for (let j = 0; j < n.length; j++) s = s.replace(new RegExp(n[j], "g"), j.toString());
+    for (let j = 0; j < n.length; j++) s = s.split(n[j]).join(j.toString());
     result += String.fromCharCode(Number(decode(s, eNum, 10)) - tNum);
   }
   return result;
 }
 
-async function fetchRawSnapsave(url: string, cursor?: string): Promise<{media: any[]; nextCursor?: string}> {
+interface SnapsaveMediaItem {
+  url: string;
+  thumbnail: string;
+  type: "video" | "image";
+}
+
+async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<SnapsaveMediaItem[]> {
   try {
-    const { $fetch } = await import("ofetch");
     const { load } = await import("cheerio");
     const formData = new URLSearchParams();
     formData.append("url", url);
 
-    const raw = await $fetch("https://snapsave.app/action.php", {
+    const response = await fetchSource("https://snapsave.app/action.php?lang=en", {
       method: "POST",
-      query: { lang: "en" },
       headers: {
         "accept": "*/*",
         "content-type": "application/x-www-form-urlencoded",
@@ -474,24 +496,25 @@ async function fetchRawSnapsave(url: string, cursor?: string): Promise<{media: a
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
       body: formData,
-      responseType: "text",
+      signal: AbortSignal.any([signal, AbortSignal.timeout(9000)]),
     });
 
+    const raw = await response.text();
     const encodedParts = raw.split("decodeURIComponent(escape(r))}(")[1]?.split("))")[0]?.split(",")?.map((v: string) => v.replace(/"/g, "").trim());
-    if (!encodedParts || encodedParts.length < 6) return { media: [], nextCursor: undefined };
+    if (!encodedParts || encodedParts.length < 6) return [];
 
     const decoded = decodeSnapApp(encodedParts);
     const html = decoded.split('getElementById("download-section").innerHTML = "')[1]?.split('"; document.getElementById("inputData").remove(); ')[0]?.replace(/\\(\\)?/g, "");
     if (!html) return [];
 
     const $ = load(html);
-    const media: any[] = [];
+    const media: SnapsaveMediaItem[] = [];
 
     $(".download-items").each((i, el) => {
       const thumb = $(el).find("img").attr("src");
       const isVideo = $(el).find(".icon-dlvideo").length > 0;
       const downloadUrl = $(el).find(".download-items__btn a").attr("href");
-      if (downloadUrl) {
+      if (downloadUrl && media.length < 100) {
         media.push({
           url: downloadUrl,
           thumbnail: thumb || downloadUrl,
@@ -501,13 +524,13 @@ async function fetchRawSnapsave(url: string, cursor?: string): Promise<{media: a
     });
 
     return media;
-  } catch (err: any) {
-    console.warn("fetchRawSnapsave error:", err?.message || err);
+  } catch {
+    console.warn("fetchRawSnapsave error:");
     return [];
   }
 }
 
-export async function extractInstagramMedia(inputUrl: string): Promise<MediaResult | null> {
+export async function extractInstagramMedia(inputUrl: string, signal: AbortSignal = AbortSignal.timeout(25000)): Promise<MediaResult | null> {
   const cleanUrl = inputUrl.trim();
   if (!cleanUrl) return null;
 
@@ -517,7 +540,7 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
 
   // If this is a profile or username lookup (not a single post/reel or direct story url)
   if (username && !isPostOrReel && !cleanUrl.includes("/stories/")) {
-    let profileResult = await extractInstagramProfile(username);
+    let profileResult = await extractInstagramProfile(username, signal);
     if (!profileResult || profileResult.formats.length === 0) {
       profileResult = createFallbackProfileResult(username);
     }
@@ -527,42 +550,44 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
       const targetProfileUrl = `https://www.instagram.com/${username}/`;
       const targetStoryUrl = `https://www.instagram.com/stories/${username}/`;
 
-      let mediaList = await fetchRawSnapsave(targetProfileUrl);
+      let mediaList = await fetchRawSnapsave(targetProfileUrl, signal);
+      let isStoryResult = false;
       if (mediaList.length === 0) {
-        mediaList = await fetchRawSnapsave(targetStoryUrl);
+        mediaList = await fetchRawSnapsave(targetStoryUrl, signal);
+        isStoryResult = true;
       }
 
       if (mediaList.length > 0) {
         const currentAvatar = profileResult.profileData?.avatarUrl || profileResult.thumbnail;
-        const allItems: ProfileMediaItem[] = mediaList.map((m: any, i: number) => ({
+        const allItems: ProfileMediaItem[] = mediaList.map((m, i) => ({
           id: `item-${i}`,
-          type: m.type === "video" || (m.url && m.url.includes(".mp4")) ? "video" : "image",
+          type: m.type === "video" || m.url.includes(".mp4") ? "video" : "image",
           thumbnail: m.thumbnail || m.url || currentAvatar,
           downloadUrl: m.url,
           caption: `@${username} Media #${i + 1}`,
-          likes: "HD",
-          comments: "",
-          timestamp: "Recent Post",
-          isVideo: m.type === "video" || (m.url && m.url.includes(".mp4")),
+          isVideo: m.type === "video" || m.url.includes(".mp4"),
         }));
 
         const reelsOnly = allItems.filter(i => i.isVideo);
 
         if (profileResult.profileData) {
-          profileResult.profileData.posts = allItems;
-          profileResult.profileData.reels = reelsOnly.length > 0 ? reelsOnly : allItems;
-          profileResult.profileData.stories = allItems;
-          if (profileResult.profileData.postsCount === "0" || profileResult.profileData.postsCount === "Public") {
+          if (isStoryResult) {
+            profileResult.profileData.stories = allItems;
+          } else {
+            profileResult.profileData.posts = allItems;
+            profileResult.profileData.reels = reelsOnly;
+          }
+          if (!isStoryResult && (profileResult.profileData.postsCount === "0" || profileResult.profileData.postsCount === "Public")) {
             profileResult.profileData.postsCount = `${allItems.length}`;
           }
         }
 
-        mediaList.forEach((item: any, idx: number) => {
+        mediaList.forEach((item, idx) => {
           if (item.url) {
             const isVideo = item.type === "video" || item.url.includes(".mp4");
             profileResult!.formats.push({
               formatId: `ig-media-${idx}`,
-              quality: isVideo ? `Video #${idx + 1} (1080p MP4)` : `Photo #${idx + 1} (HD JPG)`,
+              quality: isVideo ? `Video #${idx + 1} (MP4)` : `Photo #${idx + 1} (HD JPG)`,
               ext: isVideo ? "mp4" : "jpg",
               type: isVideo ? "video" : "image",
               downloadUrl: item.url,
@@ -571,32 +596,22 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
           }
         });
       }
-    } catch (e: any) {
-      console.warn("Snapsave profile lookup error:", e?.message || e);
+    } catch {
+      console.warn("Snapsave profile lookup error:");
     }
 
-    return profileResult;
+    signal.throwIfAborted();
+    return profileResult.formats.length ? profileResult : null;
   }
 
   try {
-    const { snapsave } = await import("snapsave-media-downloader");
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("Timeout during Instagram extraction")), 8000);
-    });
-
     const targetUrl = cleanUrl.startsWith("@")
-      ? `https://www.instagram.com/stories/${cleanUrl.slice(1)}/`
-      : cleanUrl;
-
-    const res: any = await Promise.race([snapsave(targetUrl), timeoutPromise]);
-    const mediaData = res?.data;
+      ? `https://www.instagram.com/stories/${cleanUrl.slice(1)}/` : cleanUrl;
+    const rawItems = await fetchRawSnapsave(targetUrl, signal);
+    signal.throwIfAborted();
+    const mediaData = { media: rawItems, description: "", preview: "" };
 
     if (!mediaData || !Array.isArray(mediaData.media) || mediaData.media.length === 0) {
-      // If snapsave failed, but we have a username, fall back to profile extraction
-      if (username) {
-        const prof = await extractInstagramProfile(username);
-        return prof || createFallbackProfileResult(username);
-      }
       return null;
     }
 
@@ -613,14 +628,14 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
 
     const formats: MediaFormat[] = [];
 
-    mediaList.forEach((item: any, idx: number) => {
+    mediaList.forEach((item, idx) => {
       if (item.url) {
         const isVideo = item.type === "video" || item.url.includes(".mp4");
         const ext = isVideo ? "mp4" : "jpg";
         const label = mediaList.length > 1
           ? `${isVideo ? "Video" : "Photo"} #${idx + 1}`
           : isVideo
-          ? "Full HD Video (1080p MP4)"
+          ? "Video (MP4)"
           : "High-Res Photo (JPG)";
 
         formats.push({
@@ -654,16 +669,13 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
     }
 
     if (username) {
-      const items: ProfileMediaItem[] = mediaList.map((m: any, i: number) => ({
+      const items: ProfileMediaItem[] = mediaList.map((m, i) => ({
         id: `story-${i}`,
-        type: m.type === "video" || (m.url && m.url.includes(".mp4")) ? "video" : "image",
+        type: m.type === "video" || m.url.includes(".mp4") ? "video" : "image",
         thumbnail: m.thumbnail || m.url,
         downloadUrl: m.url,
         caption: `@${username} Story #${i + 1}`,
-        likes: "HD",
-        comments: "",
-        timestamp: "Active Story",
-        isVideo: m.type === "video" || (m.url && m.url.includes(".mp4")),
+        isVideo: m.type === "video" || m.url.includes(".mp4"),
       }));
 
       return {
@@ -677,17 +689,17 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
         profileData: {
           username,
           fullName: `@${username}`,
-          avatarUrl: mediaData.preview || mediaList[0]?.thumbnail || mediaList[0]?.url,
-          hdAvatarUrl: mediaData.preview || mediaList[0]?.thumbnail || mediaList[0]?.url,
-          postsCount: `${mediaList.length}`,
+          avatarUrl: "/icon.svg",
+          hdAvatarUrl: "",
+          postsCount: "—",
           followersCount: "Public",
           followingCount: "Instagram",
           biography: `Instagram Creator @${username}`,
           isVerified: false,
-          posts: items,
+          posts: [],
           stories: items,
           highlights: [],
-          reels: items,
+          reels: [],
         },
       };
     }
@@ -700,12 +712,9 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
       platform: "Instagram",
       formats,
     };
-  } catch (err: any) {
-    console.warn("Instagram extraction error:", err?.message || err);
-    if (username) {
-      const prof = await extractInstagramProfile(username);
-      return prof || createFallbackProfileResult(username);
-    }
+  } catch {
+    console.warn("Instagram extraction error:");
+    signal.throwIfAborted();
     return null;
   }
 }

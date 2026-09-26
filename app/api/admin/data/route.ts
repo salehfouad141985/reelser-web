@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken, getAdminSettings, getAdminStats } from "@/lib/adminStore";
 
 export async function GET(req: NextRequest) {
+  try {
   const token = req.cookies.get("reelser_admin_session")?.value;
   if (!token || !verifyAdminToken(token)) {
     return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
@@ -21,5 +22,6 @@ export async function GET(req: NextRequest) {
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     },
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
+  } catch { return NextResponse.json({ success: false, error: "Storage unavailable" }, { status: 503 }); }
 }

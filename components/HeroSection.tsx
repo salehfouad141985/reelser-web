@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useLanguage } from "./LanguageProvider";
+import { AdBanner, useSiteSettings } from "./SiteSettings";
 import { MediaCard } from "./MediaCard";
 import { MediaResult } from "@/lib/instagramExtractor";
 import { Clipboard, Download, Loader2, Sparkles, X, Video, Image as ImageIcon, Music, UserCheck, AlertCircle } from "lucide-react";
@@ -17,6 +18,7 @@ export function HeroSection({
   customTitle,
   customDescription,
 }: HeroSectionProps) {
+  const { maintenance } = useSiteSettings();
   const { t, isRtl } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [url, setUrl] = useState("");
@@ -59,7 +61,7 @@ export function HeroSection({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    if (!url.trim() || maintenance) return;
 
     setLoading(true);
     setError(null);
@@ -78,9 +80,9 @@ export function HeroSection({
       }
 
       setMediaResult(data.data);
-    } catch (err: any) {
+    } catch (err) {
       setError(
-        err.message ||
+        (err instanceof Error ? err.message : "") ||
           "Could not download this link. Please ensure it is a public Instagram post or account and try again."
       );
     } finally {
@@ -90,6 +92,8 @@ export function HeroSection({
 
   return (
     <section className="relative pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden bg-radial from-pink-50/70 via-white to-orange-50/40">
+      <AdBanner position="top" />
+      {maintenance && <p role="status" className="text-center text-amber-700">{t("Service temporarily unavailable for maintenance.")}</p>}
       {/* Decorative gradient blur circles */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-tr from-pink-300/30 to-amber-200/30 blur-3xl -z-10 pointer-events-none rounded-full" />
 
@@ -97,20 +101,12 @@ export function HeroSection({
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-gradient-to-r from-pink-100 via-purple-100 to-amber-100 text-pink-700 border border-pink-200 shadow-2xs mb-6">
           <Sparkles className="w-3.5 h-3.5 text-pink-600" />
-          <span>#1 Free Instagram Downloader HD</span>
+          <span>{t("Free Instagram Downloader")}</span>
         </div>
 
         {/* Title */}
         <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight leading-tight max-w-4xl mx-auto">
-          {customTitle || (
-            <>
-              Download Instagram{" "}
-              <span className="bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] bg-clip-text text-transparent">
-                Reels & Videos
-              </span>{" "}
-              in Full HD
-            </>
-          )}
+          {customTitle || t("Free Instagram Downloader")}
         </h1>
 
         {/* Subtitle */}
@@ -147,7 +143,7 @@ export function HeroSection({
           className="mt-6 max-w-3xl mx-auto relative group"
         >
           <div className="relative flex flex-col sm:flex-row items-center bg-white p-2 rounded-2xl sm:rounded-full border-2 border-pink-200 focus-within:border-pink-500 shadow-xl shadow-pink-500/10 transition-all">
-            <input
+            <input aria-label={t("inputPlaceholder")}
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -163,7 +159,7 @@ export function HeroSection({
                   type="button"
                   onClick={handleClear}
                   className="p-2 text-gray-600 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
-                  title="Clear"
+                  title={t("Close")}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -180,7 +176,7 @@ export function HeroSection({
 
               <button
                 type="submit"
-                disabled={loading || !url.trim()}
+                disabled={loading || maintenance || !url.trim()}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl sm:rounded-full font-bold text-white bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] hover:opacity-95 shadow-lg shadow-pink-500/25 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer"
               >
                 {loading ? (
@@ -208,8 +204,9 @@ export function HeroSection({
         )}
 
         {/* Extracted Result Card */}
-        {mediaResult && <MediaCard media={mediaResult} />}
+        {mediaResult && <><AdBanner position="results" /><MediaCard key={url} media={mediaResult} /></>}
       </div>
+      <AdBanner position="bottom" />
     </section>
   );
 }

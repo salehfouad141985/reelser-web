@@ -1,60 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
-
+import { NextRequest } from "next/server";
+import { acquireLease, errorResponse, RequestError, servicePolicy } from "@/lib/requestPolicy";
+import { readTicket } from "@/lib/mediaTickets";
+import { fetchMedia, mediaKind } from "@/lib/safeMedia";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
 export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
-  const rawUrl = searchParams.get("url");
-
-  if (!rawUrl || !rawUrl.startsWith("http")) {
-    return new NextResponse("Invalid URL", { status: 400 });
-  }
-
+  let release: (() => void) | undefined;
   try {
-    const upstreamUrl = rawUrl;
-    const domain = new URL(upstreamUrl).hostname;
-
-    const headers: Record<string, string> = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-    };
-
-    if (domain.includes("iqsaved.com")) {
-      headers["Referer"] = "https://insta-stories-viewer.com/";
-    } else if (domain.includes("cdninstagram.com") || domain.includes("instagram.com")) {
-      headers["Referer"] = "https://www.instagram.com/";
-    }
-
-    const upstreamRes = await fetch(upstreamUrl, {
-      headers,
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!upstreamRes.ok) {
-      return new NextResponse(`Upstream failed: ${upstreamRes.status}`, {
-        status: upstreamRes.status,
-      });
-    }
-
-    const contentType = upstreamRes.headers.get("content-type") || "image/jpeg";
-    const cacheControl =
-      upstreamRes.headers.get("cache-control") ||
-      "public, max-age=86400, stale-while-revalidate=604800";
-
-    const responseHeaders = new Headers({
-      "Content-Type": contentType,
-      "Cache-Control": cacheControl,
-      "Access-Control-Allow-Origin": "*",
-    });
-
-    return new NextResponse(upstreamRes.body, {
-      status: 200,
-      headers: responseHeaders,
-    });
-  } catch (err: any) {
-    console.error("Proxy error:", err?.message || err);
-    return new NextResponse("Internal Server Error", { status: 500 });
-  }
+    servicePolicy(req, "proxy");
+    const ticket = readTicket(req.nextUrl.searchParams.get("ticket"), "preview");
+    release = acquireLease("download", 4);
+    const bytes = await fetchMedia(ticket.url, AbortSignal.any([req.signal, AbortSignal.timeout(10_000)]), 8 * 1024 * 1024);
+    const kind = mediaKind(bytes);
+    if (kind.type !== "image") throw new RequestError("Unsupported image", 415);
+    return new Response(new Uint8Array(bytes), { headers: {
+      "Content-Type": kind.mime, "Content-Length": String(bytes.length),
+      "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox",
+      "Cache-Control": "private, max-age=300", "Cross-Origin-Resource-Policy": "same-origin",
+    } });
+  } catch (error) { return errorResponse(error); }
+  finally { release?.(); }
 }

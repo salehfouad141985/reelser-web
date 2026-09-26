@@ -93,35 +93,20 @@ export default function ReelserAdminPage() {
   const [pwMessage, setPwMessage] = useState<string | null>(null);
   const [pwError, setPwError] = useState<string | null>(null);
 
-  const loadData = useCallback(async (isManualRefresh = false) => {
-    try {
-      if (isManualRefresh) setIsRefreshing(true);
-      else setIsLoading(true);
-
-      const res = await fetch("/api/admin/data", { cache: "no-store" });
-      if (res.ok) {
-        const json: AdminData = await res.json();
-        if (json.success) {
-          setIsAuthenticated(true);
-          setData(json);
-          setMaintenanceMode(json.settings.maintenance_mode);
-          setMaxPerHour(json.settings.max_downloads_per_ip_hour);
-          setAdTopEnabled(json.settings.ad_top_banner_enabled);
-          setAdTopCode(json.settings.ad_top_banner_code);
-          setAdResultsEnabled(json.settings.ad_results_banner_enabled);
-          setAdResultsCode(json.settings.ad_results_banner_code);
-          setAdBottomEnabled(json.settings.ad_bottom_banner_enabled);
-          setAdBottomCode(json.settings.ad_bottom_banner_code);
-          return;
-        }
-      }
-      setIsAuthenticated(false);
-    } catch {
-      setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
+  const loadData = useCallback(() => {
+    return fetch("/api/admin/data", { cache: "no-store" })
+      .then(async response => {
+        if (!response.ok) throw new Error("Unavailable");
+        const json: AdminData = await response.json();
+        if (!json.success) throw new Error("Unauthorized");
+        setIsAuthenticated(true); setData(json);
+        setMaintenanceMode(json.settings.maintenance_mode);
+        setMaxPerHour(json.settings.max_downloads_per_ip_hour);
+        setAdTopEnabled(json.settings.ad_top_banner_enabled); setAdTopCode(json.settings.ad_top_banner_code);
+        setAdResultsEnabled(json.settings.ad_results_banner_enabled); setAdResultsCode(json.settings.ad_results_banner_code);
+        setAdBottomEnabled(json.settings.ad_bottom_banner_enabled); setAdBottomCode(json.settings.ad_bottom_banner_code);
+      }).catch(() => setIsAuthenticated(false))
+      .finally(() => { setIsLoading(false); setIsRefreshing(false); });
   }, []);
 
   useEffect(() => {
@@ -200,8 +185,8 @@ export default function ReelserAdminPage() {
       setPwError("كلمتا المرور غير متطابقتين");
       return;
     }
-    if (newPassword.length < 6) {
-      setPwError("كلمة المرور يجب أن لا تقل عن 6 أحرف");
+    if (newPassword.length < 16) {
+      setPwError("كلمة المرور يجب أن لا تقل عن 16 حرفاً");
       return;
     }
 
@@ -213,7 +198,8 @@ export default function ReelserAdminPage() {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        setPwMessage("تم تغيير كلمة المرور بنجاح! احتفظ بها في مكان آمن.");
+        setIsAuthenticated(false);
+        setLoginError("تم تغيير كلمة المرور. سجّل الدخول مجدداً.");
         setNewPassword("");
         setConfirmPassword("");
         setTimeout(() => setPwMessage(null), 5000);
@@ -348,7 +334,7 @@ export default function ReelserAdminPage() {
         {/* Global Sites Switcher & Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
           <button
-            onClick={() => loadData(true)}
+            onClick={() => { setIsRefreshing(true); void loadData(); }}
             disabled={isRefreshing}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 border border-pink-500/30 text-pink-400 hover:bg-pink-500/20 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
             title="تحديث الإحصائيات الآن"
@@ -495,7 +481,7 @@ export default function ReelserAdminPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => loadData(true)}
+                  onClick={() => loadData()}
                   disabled={isRefreshing}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
@@ -513,7 +499,6 @@ export default function ReelserAdminPage() {
                   {stats.recentActivities.map((act) => {
                     const isAudio = act.type === "audio";
                     const isVideo = act.type === "video";
-                    const isExtract = act.type === "extract";
 
                     return (
                       <div key={act.id} className="p-3.5 bg-slate-900/60 hover:bg-slate-800/40 flex items-center justify-between gap-3 text-xs transition-colors">
@@ -786,7 +771,7 @@ export default function ReelserAdminPage() {
                   <input
                     type="password"
                     required
-                    minLength={6}
+                    minLength={16}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
@@ -799,7 +784,7 @@ export default function ReelserAdminPage() {
                   <input
                     type="password"
                     required
-                    minLength={6}
+                    minLength={16}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"

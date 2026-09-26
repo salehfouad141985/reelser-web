@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ExternalLink,
   Film,
-  Sparkles,
   Share2,
 } from "lucide-react";
 

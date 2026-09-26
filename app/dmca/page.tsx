@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/dmca" },
   title: "DMCA & Copyright Compliance",
   description: "DMCA and copyright notice for Reelser.",
 };

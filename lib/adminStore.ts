@@ -1,6 +1,5 @@
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
+import crypto from "node:crypto";
+import { transaction } from "./storage";
 
 export interface ActivityItem {
   id: string;
@@ -33,17 +32,6 @@ export interface AdminStats {
   recentActivities: ActivityItem[];
 }
 
-interface AdminData {
-  password_hash: string;
-  salt: string;
-  settings: AdminSettings;
-  stats: AdminStats;
-}
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "admin-config.json");
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || "reelser-super-secret-key-2026-secure-jwt";
-
 const DEFAULT_SETTINGS: AdminSettings = {
   maintenance_mode: false,
   ad_top_banner_enabled: false,
@@ -67,178 +55,136 @@ const DEFAULT_STATS: AdminStats = {
   recentActivities: [],
 };
 
-function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 10000, 64, "sha512").toString("hex");
+interface AdminData {
+  password_hash: string;
+  salt: string;
+  iterations?: number;
+  sessions?: Record<string, number>;
+  settings: AdminSettings;
+  stats: AdminStats;
 }
 
-function initAdminData(): AdminData {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const defaultPass = process.env.REELSER_ADMIN_PASS || "Admin@Reelser2026!";
-  const password_hash = hashPassword(defaultPass, salt);
+function secret() {
+  const value = process.env.ADMIN_JWT_SECRET;
+  if (!value || value.length < 32 || value === "reelser-super-secret-key-2026-secure-jwt") {
+    throw new Error("Administration disabled: configure a new random ADMIN_JWT_SECRET (32+ characters)");
+  }
+  return value;
+}
 
-  const initialData: AdminData = {
-    password_hash,
-    salt,
-    settings: { ...DEFAULT_SETTINGS },
-    stats: { ...DEFAULT_STATS },
-  };
-
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+function change<R>(fn: (data: AdminData) => R): R {
+  return transaction<AdminData, R>("admin-config", () => ({
+    password_hash: "", salt: "", iterations: 210000, sessions: {},
+    settings: { ...DEFAULT_SETTINGS }, stats: { ...DEFAULT_STATS, recentActivities: [] },
+  }), data => {
+    if (!data || typeof data.password_hash !== "string" || typeof data.salt !== "string" ||
+        !data.settings || !data.stats || !Array.isArray(data.stats.recentActivities) ||
+        (data.password_hash && (!/^[a-f0-9]{128}$/.test(data.password_hash) || !/^[a-f0-9]{32}$/.test(data.salt))) ||
+        (data.iterations !== undefined && ![10000, 210000].includes(data.iterations)) ||
+        !Number.isInteger(data.settings.max_downloads_per_ip_hour) || data.settings.max_downloads_per_ip_hour < 1 ||
+        data.settings.max_downloads_per_ip_hour > 600 || typeof data.settings.maintenance_mode !== "boolean") {
+      throw new Error("Invalid administration storage; restore a valid backup");
     }
-    fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), "utf8");
-  } catch (err) {
-    console.error("Error writing initial admin data:", err);
-  }
-
-  return initialData;
+    data.settings = { ...DEFAULT_SETTINGS, ...data.settings };
+    data.sessions ??= {}; // Legacy JWTs are intentionally invalid after migration.
+    return fn(data);
+  });
 }
 
-function loadData(): AdminData {
+function hashPassword(password: string, salt: string, iterations: number) {
+  return crypto.pbkdf2Sync(password, salt, iterations, 64, "sha512").toString("hex");
+}
+
+export function getAdminSettings() { return change(data => ({ ...data.settings })); }
+export function getAdminStats() { return change(data => data.stats); }
+export function updateAdminSettings(partial: Partial<AdminSettings>) {
+  return change(data => {
+    data.settings = { ...data.settings, ...partial };
+    return data.settings;
+  });
+}
+
+export function recordExtractionStat(success: boolean) {
+  recordActivity("extract", success);
+}
+export function recordDownloadStat(type: "video" | "audio" | "image") {
+  recordActivity(type, true);
+}
+function recordActivity(type: ActivityItem["type"], success: boolean) {
+  // Telemetry must never turn a completed transfer into a failed one.
   try {
-    if (!fs.existsSync(DATA_FILE)) {
-      return initAdminData();
-    }
-    const content = fs.readFileSync(DATA_FILE, "utf8");
-    const parsed = JSON.parse(content);
-
-    // Ensure all stat fields exist
-    parsed.stats = {
-      ...DEFAULT_STATS,
-      ...(parsed.stats || {}),
-      recentActivities: parsed.stats?.recentActivities || [],
-    };
-    return parsed;
-  } catch {
-    return initAdminData();
-  }
+    change(data => {
+      const stats = data.stats;
+      if (type === "extract") {
+        stats.totalExtractions++;
+        if (success) stats.successfulExtractions++; else stats.failedExtractions++;
+      } else {
+        stats.totalDownloads++;
+        if (type === "video") stats.videoDownloads++;
+        else if (type === "audio") stats.audioDownloads++;
+        else stats.photoDownloads++;
+      }
+      stats.lastUpdated = new Date().toISOString();
+      stats.recentActivities = [{ id: crypto.randomUUID(), type, success,
+        title: type === "extract" ? "Media extraction" : "Media download", timestamp: stats.lastUpdated },
+        ...stats.recentActivities.map(item => ({ ...item, title: "Media request" }))].slice(0, 30);
+    });
+  } catch { console.error("Unable to persist request statistics"); }
 }
 
-function saveData(data: AdminData) {
+export function verifyAdminCredentials(username: string, password: string) {
+  secret();
+  if (username !== "admin" || password === "Admin@Reelser2026!" || password.length > 1024) return false;
+  return change(data => {
+    if (!data.password_hash) {
+      const initial = process.env.REELSER_ADMIN_PASS;
+      if (!initial || initial.length < 16 || initial === "Admin@Reelser2026!") {
+        throw new Error("Administration disabled: configure REELSER_ADMIN_PASS (16+ characters)");
+      }
+      data.salt = crypto.randomBytes(16).toString("hex");
+      data.iterations = 210000;
+      data.password_hash = hashPassword(initial, data.salt, data.iterations);
+    }
+    const actual = hashPassword(password, data.salt, data.iterations ?? 10000);
+    return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(data.password_hash, "hex"));
+  });
+}
+
+export function updateAdminPassword(password: string) {
+  secret();
+  if (typeof password !== "string" || password.length < 16 || password.length > 1024) return false;
+  return change(data => {
+    data.salt = crypto.randomBytes(16).toString("hex");
+    data.iterations = 210000;
+    data.password_hash = hashPassword(password, data.salt, data.iterations);
+    data.sessions = {};
+    return true;
+  });
+}
+
+function sessionHash(token: string) {
+  return crypto.createHmac("sha256", secret()).update(token).digest("hex");
+}
+export function createAdminToken() {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const hash = sessionHash(token);
+  change(data => {
+    data.sessions = Object.fromEntries(Object.entries(data.sessions!).filter(([, exp]) => exp > Date.now()).slice(-19));
+    data.sessions[hash] = Date.now() + 86400_000;
+  });
+  return token;
+}
+export function verifyAdminToken(token: string) {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
-  } catch (err) {
-    console.error("Error saving admin data:", err);
-  }
+    if (!/^[\w-]{43}$/.test(token)) return false;
+    const hash = sessionHash(token);
+    return change(data => {
+      const exp = data.sessions![hash];
+      return Number.isFinite(exp) && exp > Date.now();
+    });
+  } catch { return false; }
 }
-
-export function getAdminSettings(): AdminSettings {
-  return loadData().settings;
-}
-
-export function updateAdminSettings(partial: Partial<AdminSettings>): AdminSettings {
-  const data = loadData();
-  data.settings = { ...data.settings, ...partial };
-  saveData(data);
-  return data.settings;
-}
-
-export function getAdminStats(): AdminStats {
-  return loadData().stats;
-}
-
-export function recordExtractionStat(success: boolean, title?: string) {
-  const data = loadData();
-  data.stats.totalExtractions += 1;
-  if (success) {
-    data.stats.successfulExtractions += 1;
-  } else {
-    data.stats.failedExtractions += 1;
-  }
-  data.stats.lastUpdated = new Date().toISOString();
-
-  // Add to recent activity
-  const newActivity: ActivityItem = {
-    id: crypto.randomBytes(4).toString("hex"),
-    type: "extract",
-    title: title ? title.slice(0, 60) : "استخراج رابط إنستغرام",
-    timestamp: new Date().toISOString(),
-    success,
-  };
-
-  data.stats.recentActivities = [newActivity, ...(data.stats.recentActivities || [])].slice(0, 30);
-  saveData(data);
-}
-
-export function recordDownloadStat(type: "video" | "audio" | "image", title?: string) {
-  const data = loadData();
-  data.stats.totalDownloads += 1;
-  if (type === "audio") {
-    data.stats.audioDownloads += 1;
-  } else if (type === "video") {
-    data.stats.videoDownloads += 1;
-  } else {
-    data.stats.photoDownloads += 1;
-  }
-  data.stats.lastUpdated = new Date().toISOString();
-
-  const newActivity: ActivityItem = {
-    id: crypto.randomBytes(4).toString("hex"),
-    type,
-    title: title ? title.slice(0, 60) : (type === "audio" ? "تحميل صوت MP3" : "تحميل فيديو MP4"),
-    timestamp: new Date().toISOString(),
-    success: true,
-  };
-
-  data.stats.recentActivities = [newActivity, ...(data.stats.recentActivities || [])].slice(0, 30);
-  saveData(data);
-}
-
-export function verifyAdminCredentials(username: string, password: string): boolean {
-  if (username.trim().toLowerCase() !== "admin") return false;
-  const data = loadData();
-  const calculated = hashPassword(password, data.salt);
-  return crypto.timingSafeEqual(Buffer.from(calculated), Buffer.from(data.password_hash));
-}
-
-export function updateAdminPassword(newPassword: string): boolean {
-  if (!newPassword || newPassword.length < 6) return false;
-  const data = loadData();
-  const newSalt = crypto.randomBytes(16).toString("hex");
-  data.salt = newSalt;
-  data.password_hash = hashPassword(newPassword, newSalt);
-  saveData(data);
-  return true;
-}
-
-export function createAdminToken(): string {
-  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-  const payload = Buffer.from(
-    JSON.stringify({
-      user: "admin",
-      role: "SUPER_ADMIN",
-      exp: Math.floor(Date.now() / 1000) + 86400 * 7,
-    })
-  ).toString("base64url");
-  const signature = crypto
-    .createHmac("sha256", JWT_SECRET)
-    .update(`${header}.${payload}`)
-    .digest("base64url");
-  return `${header}.${payload}.${signature}`;
-}
-
-export function verifyAdminToken(token: string): boolean {
-  if (!token) return false;
-  const parts = token.split(".");
-  if (parts.length !== 3) return false;
-  const [header, payload, signature] = parts;
-  const expectedSig = crypto
-    .createHmac("sha256", JWT_SECRET)
-    .update(`${header}.${payload}`)
-    .digest("base64url");
-  if (signature !== expectedSig) return false;
-
-  try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    if (data.exp && data.exp < Math.floor(Date.now() / 1000)) {
-      return false;
-    }
-    return data.user === "admin";
-  } catch {
-    return false;
-  }
+export function revokeAdminToken(token: string) {
+  const hash = sessionHash(token);
+  change(data => { delete data.sessions![hash]; });
 }

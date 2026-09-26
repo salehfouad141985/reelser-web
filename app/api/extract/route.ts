@@ -1,56 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
-import { extractInstagramMedia, isValidInstagramUrl } from "@/lib/instagramExtractor";
+import { NextRequest } from "next/server";
+import { extractInstagramMedia, extractInstagramUsername, isValidInstagramUrl } from "@/lib/instagramExtractor";
 import { recordExtractionStat } from "@/lib/adminStore";
-
+import { authorizeMedia } from "@/lib/mediaTickets";
+import { acquireLease, errorResponse, readJson, RequestError, servicePolicy } from "@/lib/requestPolicy";
+export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
+  let release: (() => void) | undefined;
   try {
-    const body = await req.json();
-    const url = body?.url;
-
-    if (!url || typeof url !== "string") {
-      return NextResponse.json(
-        { success: false, error: "Please enter a valid Instagram URL / الرجاء إدخال رابط إنستغرام صالح" },
-        { status: 400 }
-      );
+    servicePolicy(req, "extract");
+    const body = await readJson(req, 4096);
+    if (typeof body.url !== "string" || body.url.length > 2048 || !isValidInstagramUrl(body.url)) {
+      throw new RequestError("Please enter a valid Instagram URL or @username / أدخل رابط إنستغرام أو اسم حساب صالح");
     }
-
-    if (!isValidInstagramUrl(url)) {
-      recordExtractionStat(false, "رابط أو حساب غير صالح");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Please enter a valid Instagram URL or @username / الرجاء إدخال رابط إنستغرام أو اسم حساب صالح (@username)",
-        },
-        { status: 400 }
-      );
-    }
-
-    const result = await extractInstagramMedia(url);
-
-    if (!result || result.formats.length === 0) {
-      recordExtractionStat(false, "فشل استخراج الرابط");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to extract media from this Instagram link. Make sure the post is public and try again.",
-        },
-        { status: 422 }
-      );
-    }
-
-    // Record successful extraction
-    recordExtractionStat(true, result.title);
-
-    return NextResponse.json({
-      success: true,
-      data: result,
-    });
-  } catch (error: any) {
-    console.error("API extract error:", error);
-    recordExtractionStat(false, "خطأ في السيرفر");
-    return NextResponse.json(
-      { success: false, error: error?.message || "Server error processing request" },
-      { status: 500 }
-    );
-  }
+    release = acquireLease("extract", 4);
+    const username = extractInstagramUsername(body.url);
+    const input = body.tab === "story" && username ? `https://www.instagram.com/stories/${username}/` : body.url;
+    const signal = AbortSignal.any([req.signal, AbortSignal.timeout(25000)]);
+    const result = await extractInstagramMedia(input, signal);
+    signal.throwIfAborted();
+    if (!result || !result.formats.length) throw new RequestError("No public media could be retrieved. Try again later. / تعذّر جلب وسائط عامة، حاول لاحقاً", 422);
+    const data = authorizeMedia(result);
+    if (!data.formats.length) throw new RequestError("The media source is not supported", 422);
+    recordExtractionStat(true);
+    return Response.json({ success: true, data }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    recordExtractionStat(false);
+    return errorResponse(error);
+  } finally { release?.(); }
 }

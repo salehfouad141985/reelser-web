@@ -4,7 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import Script from "next/script";
+import { SiteSettings } from "@/components/SiteSettings";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const amiri = Amiri({ subsets: ["arabic", "latin"], weight: ["400", "700"], variable: "--font-amiri", display: "swap" });
@@ -19,7 +19,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://reelser.com"),
   title: {
-    default: "Reelser - Best Instagram Reels & Video Downloader in Full HD (1080p)",
+    default: "Reelser - Instagram Reels & Video Downloader",
     template: "%s | Reelser",
   },
   description:
@@ -48,9 +48,9 @@ export const metadata: Metadata = {
     canonical: "https://reelser.com",
   },
   openGraph: {
-    title: "Reelser - Instagram Reels & Video Downloader (Full HD)",
+    title: "Reelser - Instagram Reels & Video Downloader (source quality)",
     description:
-      "Save Instagram Reels, Videos, Stories, Photos, and Audio directly to your device for free in pristine 1080p quality.",
+      "Save Instagram Reels, Videos, Stories, Photos, and Audio directly to your device for free in the quality available from the source.",
     url: "https://reelser.com",
     siteName: "Reelser",
     locale: "en_US",
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Reelser - Free Instagram Reels & Video Downloader",
-    description: "Download Instagram Reels & Videos in 1080p Full HD without watermark or login.",
+    description: "Download Instagram Reels & Videos in source quality without watermark or login.",
   },
   robots: {
     index: true,
@@ -87,7 +87,7 @@ export default function RootLayout({
         "@id": "https://reelser.com/#website",
         url: "https://reelser.com",
         name: "Reelser",
-        description: "Best Instagram Reels & Video Downloader in Full HD",
+        description: "Best Instagram Reels & Video Downloader in source quality",
         potentialAction: {
           "@type": "SearchAction",
           target: "https://reelser.com/?url={search_term_string}",
@@ -106,13 +106,6 @@ export default function RootLayout({
           price: "0",
           priceCurrency: "USD",
         },
-        aggregateRating: {
-          "@type": "AggregateRating",
-          ratingValue: "4.9",
-          ratingCount: "8420",
-          bestRating: "5",
-          worstRating: "1",
-        },
       },
     ],
   };
@@ -124,27 +117,14 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {/* Google Analytics 4 (GA4) */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-VGFMN0V8KB"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-VGFMN0V8KB', {
-              page_path: window.location.pathname,
-            });
-          `}
-        </Script>
       </head>
       <body className="min-h-screen flex flex-col bg-white text-gray-900 font-sans antialiased selection:bg-pink-500 selection:text-white">
         <LanguageProvider>
+          <SiteSettings>
           <Navbar />
           <main className="flex-1">{children}</main>
           <Footer />
+          </SiteSettings>
         </LanguageProvider>
       </body>
     </html>

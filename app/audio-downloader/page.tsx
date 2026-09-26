@@ -7,7 +7,7 @@ import { FaqSection } from "@/components/FaqSection";
 export const metadata: Metadata = {
   title: "Instagram Audio Downloader - Extract Reels Audio & Music to MP3",
   description:
-    "Extract and download audio tracks, background music, and sounds from Instagram Reels and videos in high-quality 320kbps MP3 format.",
+    "Extract and download audio tracks, background music, and sounds from Instagram Reels and videos in high-quality 192kbps MP3 format.",
   alternates: {
     canonical: "https://reelser.com/audio-downloader",
   },
