@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
+import { recordDownloadStat } from "@/lib/adminStore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest) {
         const ffmpegProc = spawn(/*turbopackIgnore: true*/ binary, ffmpegArgs, {
           stdio: ["ignore", "pipe", "pipe"],
         });
+
+        // Record audio download stat
+        recordDownloadStat("audio", cleanTitle);
 
         const responseHeaders = new Headers({
           "Content-Type": "audio/mpeg",
@@ -115,6 +119,9 @@ export async function GET(req: NextRequest) {
       else if (ext === "jpg" || ext === "jpeg") contentType = "image/jpeg";
       else contentType = "application/octet-stream";
     }
+
+    // Record video or photo download stat
+    recordDownloadStat(ext === "mp4" ? "video" : "image", cleanTitle);
 
     const responseHeaders = new Headers({
       "Content-Type": contentType,

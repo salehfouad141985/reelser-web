@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractInstagramMedia, isValidInstagramUrl } from "@/lib/instagramExtractor";
+import { recordExtractionStat } from "@/lib/adminStore";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isValidInstagramUrl(url)) {
+      recordExtractionStat(false, "رابط غير صالح");
       return NextResponse.json(
         {
           success: false,
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
     const result = await extractInstagramMedia(url);
 
     if (!result || result.formats.length === 0) {
+      recordExtractionStat(false, "فشل استخراج الرابط");
       return NextResponse.json(
         {
           success: false,
@@ -35,12 +38,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Record successful extraction
+    recordExtractionStat(true, result.title);
+
     return NextResponse.json({
       success: true,
       data: result,
     });
   } catch (error: any) {
     console.error("API extract error:", error);
+    recordExtractionStat(false, "خطأ في السيرفر");
     return NextResponse.json(
       { success: false, error: error?.message || "Server error processing request" },
       { status: 500 }

@@ -2,6 +2,14 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
+export interface ActivityItem {
+  id: string;
+  type: "video" | "audio" | "image" | "extract";
+  title: string;
+  timestamp: string;
+  success: boolean;
+}
+
 export interface AdminSettings {
   maintenance_mode: boolean;
   ad_top_banner_enabled: boolean;
@@ -17,7 +25,12 @@ export interface AdminStats {
   totalExtractions: number;
   successfulExtractions: number;
   failedExtractions: number;
+  totalDownloads: number;
+  videoDownloads: number;
+  audioDownloads: number;
+  photoDownloads: number;
   lastUpdated: string;
+  recentActivities: ActivityItem[];
 }
 
 interface AdminData {
@@ -43,10 +56,15 @@ const DEFAULT_SETTINGS: AdminSettings = {
 };
 
 const DEFAULT_STATS: AdminStats = {
-  totalExtractions: 142,
-  successfulExtractions: 139,
-  failedExtractions: 3,
+  totalExtractions: 0,
+  successfulExtractions: 0,
+  failedExtractions: 0,
+  totalDownloads: 0,
+  videoDownloads: 0,
+  audioDownloads: 0,
+  photoDownloads: 0,
   lastUpdated: new Date().toISOString(),
+  recentActivities: [],
 };
 
 function hashPassword(password: string, salt: string): string {
@@ -83,7 +101,15 @@ function loadData(): AdminData {
       return initAdminData();
     }
     const content = fs.readFileSync(DATA_FILE, "utf8");
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+
+    // Ensure all stat fields exist
+    parsed.stats = {
+      ...DEFAULT_STATS,
+      ...(parsed.stats || {}),
+      recentActivities: parsed.stats?.recentActivities || [],
+    };
+    return parsed;
   } catch {
     return initAdminData();
   }
@@ -115,7 +141,7 @@ export function getAdminStats(): AdminStats {
   return loadData().stats;
 }
 
-export function recordExtractionStat(success: boolean) {
+export function recordExtractionStat(success: boolean, title?: string) {
   const data = loadData();
   data.stats.totalExtractions += 1;
   if (success) {
@@ -124,6 +150,41 @@ export function recordExtractionStat(success: boolean) {
     data.stats.failedExtractions += 1;
   }
   data.stats.lastUpdated = new Date().toISOString();
+
+  // Add to recent activity
+  const newActivity: ActivityItem = {
+    id: crypto.randomBytes(4).toString("hex"),
+    type: "extract",
+    title: title ? title.slice(0, 60) : "استخراج رابط إنستغرام",
+    timestamp: new Date().toISOString(),
+    success,
+  };
+
+  data.stats.recentActivities = [newActivity, ...(data.stats.recentActivities || [])].slice(0, 30);
+  saveData(data);
+}
+
+export function recordDownloadStat(type: "video" | "audio" | "image", title?: string) {
+  const data = loadData();
+  data.stats.totalDownloads += 1;
+  if (type === "audio") {
+    data.stats.audioDownloads += 1;
+  } else if (type === "video") {
+    data.stats.videoDownloads += 1;
+  } else {
+    data.stats.photoDownloads += 1;
+  }
+  data.stats.lastUpdated = new Date().toISOString();
+
+  const newActivity: ActivityItem = {
+    id: crypto.randomBytes(4).toString("hex"),
+    type,
+    title: title ? title.slice(0, 60) : (type === "audio" ? "تحميل صوت MP3" : "تحميل فيديو MP4"),
+    timestamp: new Date().toISOString(),
+    success: true,
+  };
+
+  data.stats.recentActivities = [newActivity, ...(data.stats.recentActivities || [])].slice(0, 30);
   saveData(data);
 }
 
@@ -150,7 +211,7 @@ export function createAdminToken(): string {
     JSON.stringify({
       user: "admin",
       role: "SUPER_ADMIN",
-      exp: Math.floor(Date.now() / 1000) + 86400 * 7, // 7 days
+      exp: Math.floor(Date.now() / 1000) + 86400 * 7,
     })
   ).toString("base64url");
   const signature = crypto
@@ -174,7 +235,7 @@ export function verifyAdminToken(token: string): boolean {
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
     if (data.exp && data.exp < Math.floor(Date.now() / 1000)) {
-      return false; // expired
+      return false;
     }
     return data.user === "admin";
   } catch {

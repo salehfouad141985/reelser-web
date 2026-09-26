@@ -17,7 +17,19 @@ import {
   Save,
   Sliders,
   Radio,
+  Download,
+  Film,
+  Music,
+  Clock,
 } from "lucide-react";
+
+interface ActivityItem {
+  id: string;
+  type: "video" | "audio" | "image" | "extract";
+  title: string;
+  timestamp: string;
+  success: boolean;
+}
 
 interface AdminData {
   success: boolean;
@@ -36,7 +48,12 @@ interface AdminData {
     totalExtractions: number;
     successfulExtractions: number;
     failedExtractions: number;
+    totalDownloads: number;
+    videoDownloads: number;
+    audioDownloads: number;
+    photoDownloads: number;
     lastUpdated: string;
+    recentActivities: ActivityItem[];
   };
   system: {
     platform: string;
@@ -56,6 +73,7 @@ export default function ReelserAdminPage() {
   const [activeTab, setActiveTab] = useState<"stats" | "ads" | "settings" | "security">("stats");
   const [data, setData] = useState<AdminData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -75,9 +93,11 @@ export default function ReelserAdminPage() {
   const [pwMessage, setPwMessage] = useState<string | null>(null);
   const [pwError, setPwError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isManualRefresh = false) => {
     try {
-      setIsLoading(true);
+      if (isManualRefresh) setIsRefreshing(true);
+      else setIsLoading(true);
+
       const res = await fetch("/api/admin/data", { cache: "no-store" });
       if (res.ok) {
         const json: AdminData = await res.json();
@@ -100,6 +120,7 @@ export default function ReelserAdminPage() {
       setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -206,7 +227,7 @@ export default function ReelserAdminPage() {
 
   if (isLoading && isAuthenticated === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
         <RefreshCw className="w-8 h-8 animate-spin text-pink-500" />
       </div>
     );
@@ -222,7 +243,7 @@ export default function ReelserAdminPage() {
               <ShieldAlert className="w-8 h-8" />
             </div>
             <h1 className="text-2xl font-bold text-white">لوحة تحكم Reelser.com</h1>
-            <p className="text-slate-400 text-sm mt-1">سجل الدخول لإدارة الموقع والإعلانات والإحصائيات</p>
+            <p className="text-slate-400 text-sm mt-1">سجل الدخول لإدارة الموقع والإعلانات والإحصائيات الحية</p>
           </div>
 
           {loginError && (
@@ -289,7 +310,18 @@ export default function ReelserAdminPage() {
   }
 
   // Authenticated view
-  const stats = data?.stats || { totalExtractions: 0, successfulExtractions: 0, failedExtractions: 0, lastUpdated: "" };
+  const stats = data?.stats || {
+    totalExtractions: 0,
+    successfulExtractions: 0,
+    failedExtractions: 0,
+    totalDownloads: 0,
+    videoDownloads: 0,
+    audioDownloads: 0,
+    photoDownloads: 0,
+    lastUpdated: "",
+    recentActivities: [],
+  };
+
   const successRate = stats.totalExtractions > 0
     ? ((stats.successfulExtractions / stats.totalExtractions) * 100).toFixed(1)
     : "100";
@@ -306,15 +338,25 @@ export default function ReelserAdminPage() {
             <h1 className="font-bold text-white text-base sm:text-lg flex items-center gap-2">
               <span>Reelser.com</span>
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30">
-                لوحة الإدارة
+                لوحة الإدارة الحية
               </span>
             </h1>
-            <p className="text-xs text-slate-400">إدارة الموقع، الإعلانات، ومتابعة الأداء</p>
+            <p className="text-xs text-slate-400">إحصائيات فورية، إدارة الإعلانات، ومتابعة الأداء</p>
           </div>
         </div>
 
         {/* Global Sites Switcher & Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => loadData(true)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 border border-pink-500/30 text-pink-400 hover:bg-pink-500/20 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+            title="تحديث الإحصائيات الآن"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            <span>تحديث لحظي</span>
+          </button>
+
           <a
             href="https://saveyou2be.com/admin"
             target="_blank"
@@ -348,7 +390,7 @@ export default function ReelserAdminPage() {
             }`}
           >
             <Activity className="w-4 h-4" />
-            <span>الإحصائيات والأداء</span>
+            <span>الإحصائيات المباشرة</span>
           </button>
 
           <button
@@ -391,30 +433,130 @@ export default function ReelserAdminPage() {
         {/* Tab 1: Stats & Overview */}
         {activeTab === "stats" && (
           <div className="space-y-6">
+            {/* Primary Metrics Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                <span className="text-xs font-semibold text-slate-400">إجمالي عمليات الاستخراج</span>
-                <p className="text-2xl font-black text-white mt-2">{stats.totalExtractions.toLocaleString()}</p>
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>إجمالي التحميلات الفعلية</span>
+                  <Download className="w-4 h-4 text-emerald-400" />
+                </div>
+                <p className="text-3xl font-black text-emerald-400 mt-2">{stats.totalDownloads.toLocaleString()}</p>
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1 text-purple-400 font-semibold">
+                    <Music className="w-3 h-3" /> {stats.audioDownloads} صوت
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 text-pink-400 font-semibold">
+                    <Film className="w-3 h-3" /> {stats.videoDownloads} فيديو
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>عمليات فحص واستخراج الروابط</span>
+                  <Activity className="w-4 h-4 text-pink-400" />
+                </div>
+                <p className="text-3xl font-black text-white mt-2">{stats.totalExtractions.toLocaleString()}</p>
                 <span className="text-[11px] text-pink-400 font-medium">ريلز، فيديو، ستوري، صور</span>
               </div>
 
               <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                <span className="text-xs font-semibold text-slate-400">نسبة نجاح التحميل</span>
-                <p className="text-2xl font-black text-emerald-400 mt-2">{successRate}%</p>
-                <span className="text-[11px] text-emerald-500 font-medium">سيرفرات سريعة ومستقرة</span>
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>نسبة نجاح الاستخراج</span>
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                </div>
+                <p className="text-3xl font-black text-emerald-400 mt-2">{successRate}%</p>
+                <span className="text-[11px] text-emerald-500 font-medium">
+                  {stats.successfulExtractions} ناجحة / {stats.failedExtractions} فاشلة
+                </span>
               </div>
 
               <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                <span className="text-xs font-semibold text-slate-400">حالة الربط مع إنستغرام</span>
-                <p className="text-2xl font-black text-blue-400 mt-2">متصل (Active)</p>
-                <span className="text-[11px] text-blue-300 font-medium">Snapsave Extractor Engine</span>
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>الصفحات المفهرسة</span>
+                  <Radio className="w-4 h-4 text-blue-400" />
+                </div>
+                <p className="text-3xl font-black text-blue-400 mt-2">45 صفحة</p>
+                <span className="text-[11px] text-blue-300 font-medium">Google + Bing sitemap</span>
+              </div>
+            </div>
+
+            {/* Live Activity Feed */}
+            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-white text-base flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-pink-500" />
+                    <span>سجل النشاط المباشر (آخر العمليات المسجلة)</span>
+                  </h3>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    يتم تسجيل كل عملية تحميل واستخراج لحظياً بدقة
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadData(true)}
+                  disabled={isRefreshing}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                  <span>تحديث</span>
+                </button>
               </div>
 
-              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                <span className="text-xs font-semibold text-slate-400">الصفحات المفهرسة</span>
-                <p className="text-2xl font-black text-purple-400 mt-2">45 صفحة</p>
-                <span className="text-[11px] text-purple-300 font-medium">Google + Bing sitemap</span>
-              </div>
+              {(!stats.recentActivities || stats.recentActivities.length === 0) ? (
+                <div className="py-12 text-center text-slate-500 text-xs">
+                  لا توجد عمليات مسجلة حتى الآن. بمجرد قيامك أو قيام أي زائر بالتحميل، ستظهر هنا فورياً!
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-800/80">
+                  {stats.recentActivities.map((act) => {
+                    const isAudio = act.type === "audio";
+                    const isVideo = act.type === "video";
+                    const isExtract = act.type === "extract";
+
+                    return (
+                      <div key={act.id} className="p-3.5 bg-slate-900/60 hover:bg-slate-800/40 flex items-center justify-between gap-3 text-xs transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span
+                            className={`p-2 rounded-lg shrink-0 ${
+                              isAudio
+                                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                : isVideo
+                                ? "bg-pink-500/20 text-pink-400 border border-pink-500/30"
+                                : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                            }`}
+                          >
+                            {isAudio ? <Music className="w-3.5 h-3.5" /> : isVideo ? <Film className="w-3.5 h-3.5" /> : <Activity className="w-3.5 h-3.5" />}
+                          </span>
+
+                          <div className="min-w-0">
+                            <p className="font-semibold text-white truncate">{act.title || "عملية بدون عنوان"}</p>
+                            <span className="text-[11px] text-slate-400">
+                              {isAudio ? "تحميل صوت MP3" : isVideo ? "تحميل فيديو MP4" : "استخراج بيانات الرابط"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              act.success
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : "bg-red-500/10 text-red-400 border border-red-500/20"
+                            }`}
+                          >
+                            {act.success ? "ناجح ✓" : "فشل ✕"}
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            {new Date(act.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Quick Links Card */}
