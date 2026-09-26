@@ -15,11 +15,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isValidInstagramUrl(url)) {
-      recordExtractionStat(false, "رابط غير صالح");
+      recordExtractionStat(false, "رابط أو حساب غير صالح");
       return NextResponse.json(
         {
           success: false,
-          error: "The provided URL is not a recognized Instagram link. Please paste a link from Reels, Stories, or Posts.",
+          error: "Please enter a valid Instagram URL or @username / الرجاء إدخال رابط إنستغرام أو اسم حساب صالح (@username)",
         },
         { status: 400 }
       );

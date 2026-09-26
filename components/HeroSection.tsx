@@ -50,6 +50,13 @@ export function HeroSection({
     setMediaResult(null);
   };
 
+  const getPlaceholder = () => {
+    if (activeTab === "profile") return t("inputPlaceholderProfile");
+    if (activeTab === "story") return t("inputPlaceholderStory");
+    if (activeTab === "reels") return t("inputPlaceholderReels");
+    return t("inputPlaceholder");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
@@ -62,7 +69,7 @@ export function HeroSection({
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), tab: activeTab }),
       });
 
       const data = await res.json();
@@ -74,7 +81,7 @@ export function HeroSection({
     } catch (err: any) {
       setError(
         err.message ||
-          "Could not download this link. Please ensure it is a public Instagram post and try again."
+          "Could not download this link. Please ensure it is a public Instagram post or account and try again."
       );
     } finally {
       setLoading(false);
@@ -144,7 +151,7 @@ export function HeroSection({
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder={t("inputPlaceholder")}
+              placeholder={getPlaceholder()}
               dir={isRtl ? "rtl" : "ltr"}
               className="w-full px-4 py-3.5 sm:py-3 text-base text-gray-900 placeholder-gray-600 bg-transparent border-0 focus:outline-hidden focus:ring-0"
               required
