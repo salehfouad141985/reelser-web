@@ -545,49 +545,42 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
       profileResult = createFallbackProfileResult(username);
     }
 
-    // Fetch full 12 media items (posts, reels, stories) via direct snapsave
+    // Profile media and active stories are separate source lookups.
     try {
       const targetProfileUrl = `https://www.instagram.com/${username}/`;
       const targetStoryUrl = `https://www.instagram.com/stories/${username}/`;
 
-      let mediaList = await fetchRawSnapsave(targetProfileUrl, signal);
-      let isStoryResult = false;
-      if (mediaList.length === 0) {
-        mediaList = await fetchRawSnapsave(targetStoryUrl, signal);
-        isStoryResult = true;
-      }
-
-      if (mediaList.length > 0) {
-        const currentAvatar = profileResult.profileData?.avatarUrl || profileResult.thumbnail;
-        const allItems: ProfileMediaItem[] = mediaList.map((m, i) => ({
-          id: `item-${i}`,
+      const [postMedia, storyMedia] = await Promise.all([
+        fetchRawSnapsave(targetProfileUrl, signal),
+        fetchRawSnapsave(targetStoryUrl, signal),
+      ]);
+      const currentAvatar = profileResult.profileData?.avatarUrl || profileResult.thumbnail;
+      const toItems = (items: SnapsaveMediaItem[], prefix: string): ProfileMediaItem[] =>
+        items.map((m, i) => ({
+          id: `${prefix}-${i}`,
           type: m.type === "video" || m.url.includes(".mp4") ? "video" : "image",
           thumbnail: m.thumbnail || m.url || currentAvatar,
           downloadUrl: m.url,
-          caption: `@${username} Media #${i + 1}`,
+          caption: `@${username} ${prefix === "story" ? "Story" : "Media"} #${i + 1}`,
           isVideo: m.type === "video" || m.url.includes(".mp4"),
         }));
-
-        const reelsOnly = allItems.filter(i => i.isVideo);
-
-        if (profileResult.profileData) {
-          if (isStoryResult) {
-            profileResult.profileData.stories = allItems;
-          } else {
-            profileResult.profileData.posts = allItems;
-            profileResult.profileData.reels = reelsOnly;
-          }
-          if (!isStoryResult && (profileResult.profileData.postsCount === "0" || profileResult.profileData.postsCount === "Public")) {
-            profileResult.profileData.postsCount = `${allItems.length}`;
-          }
+      const posts = toItems(postMedia, "post");
+      const stories = toItems(storyMedia, "story");
+      if (profileResult.profileData) {
+        profileResult.profileData.posts = posts;
+        profileResult.profileData.reels = posts.filter(item => item.isVideo);
+        profileResult.profileData.stories = stories;
+        if (posts.length && (profileResult.profileData.postsCount === "0" || profileResult.profileData.postsCount === "Public")) {
+          profileResult.profileData.postsCount = `${posts.length}`;
         }
-
-        mediaList.forEach((item, idx) => {
+      }
+      for (const [kind, items] of [["post", postMedia], ["story", storyMedia]] as const) {
+        items.forEach((item, idx) => {
           if (item.url) {
             const isVideo = item.type === "video" || item.url.includes(".mp4");
             profileResult!.formats.push({
-              formatId: `ig-media-${idx}`,
-              quality: isVideo ? `Video #${idx + 1} (MP4)` : `Photo #${idx + 1} (HD JPG)`,
+              formatId: `ig-${kind}-${idx}`,
+              quality: `${kind === "story" ? "Story" : isVideo ? "Video" : "Photo"} #${idx + 1} (${isVideo ? "MP4" : "HD JPG"})`,
               ext: isVideo ? "mp4" : "jpg",
               type: isVideo ? "video" : "image",
               downloadUrl: item.url,

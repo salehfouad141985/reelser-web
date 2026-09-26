@@ -4,11 +4,12 @@ import { isIP } from "node:net";
 import { RequestError } from "./requestPolicy";
 
 const HOSTS = ["cdninstagram.com", "fbcdn.net", "iqsaved.com"];
+const EXACT_HOSTS = new Set(["d.rapidcdn.app"]);
 export function validateMediaUrl(raw: string) {
   let url: URL;
   try { url = new URL(raw); } catch { throw new RequestError("Invalid media URL"); }
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") ||
-      !HOSTS.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`))) {
+      !EXACT_HOSTS.has(url.hostname) && !HOSTS.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`))) {
     throw new RequestError("Unsupported media source");
   }
   return url;

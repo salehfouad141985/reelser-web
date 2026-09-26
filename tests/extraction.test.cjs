@@ -9,7 +9,9 @@ function encodedMedia() {
   return `decodeURIComponent(escape(r))}("${encoded}",0,"abc",0,2,0))`;
 }
 test("post results keep photos out of reels and posts out of stories", async () => {
-  const fetch = mock.method(globalThis, "fetch", async url => String(url).includes("snapsave.app") ? new Response(encodedMedia()) : new Response("", { status: 503 }));
+  const fetch = mock.method(globalThis, "fetch", async (url, options) => String(url).includes("snapsave.app")
+    ? new Response(options.body.get("url").includes("/stories/") ? "invalid encoding" : encodedMedia())
+    : new Response("", { status: 503 }));
   try {
     const result = await extractInstagramMedia("@example");
     assert.equal(result.profileData.posts.length, 2);
@@ -20,13 +22,13 @@ test("post results keep photos out of reels and posts out of stories", async () 
     assert.equal(result.formats.length, 2);
   } finally { fetch.mock.restore(); }
 });
-test("empty first response triggers the story fallback with the same cancellation signal", async () => {
+test("stories are fetched separately even when profile media is empty", async () => {
   let calls = 0;
   const fetch = mock.method(globalThis, "fetch", async (url, options) => {
     if (!String(url).includes("snapsave.app")) return new Response("", { status: 503 });
     assert.ok(options.signal);
     calls++;
-    return new Response(calls === 1 ? "invalid encoding" : encodedMedia());
+    return new Response(options.body.get("url").includes("/stories/") ? encodedMedia() : "invalid encoding");
   });
   try {
     const result = await extractInstagramMedia("@example");
@@ -34,6 +36,17 @@ test("empty first response triggers the story fallback with the same cancellatio
     assert.equal(result.profileData.posts.length, 0);
     assert.equal(result.profileData.reels.length, 0);
     assert.equal(result.profileData.stories.length, 2);
+  } finally { fetch.mock.restore(); }
+});
+test("active stories appear alongside posts and reels", async () => {
+  const fetch = mock.method(globalThis, "fetch", async (url) => String(url).includes("snapsave.app")
+    ? new Response(encodedMedia()) : new Response("", { status: 503 }));
+  try {
+    const result = await extractInstagramMedia("@example");
+    assert.equal(result.profileData.posts.length, 2);
+    assert.equal(result.profileData.reels.length, 1);
+    assert.equal(result.profileData.stories.length, 2);
+    assert.equal(result.formats.length, 4);
   } finally { fetch.mock.restore(); }
 });
 test("direct story links do not invent an avatar or posts", async () => {

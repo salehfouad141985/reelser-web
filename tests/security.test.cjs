@@ -62,6 +62,23 @@ test("SSRF policy rejects local IPs, lookalike hosts, credentials and unsafe pro
   for (const ip of ["127.0.0.1", "10.0.0.1", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "::ffff:127.0.0.1"]) assert.equal(media.publicAddress(ip), false);
   assert.equal(media.publicAddress("8.8.8.8"), true);
 });
+test("SnapSave CDN media receives tickets only from its exact verified host", () => {
+  const source = "https://d.rapidcdn.app/photo.jpg";
+  assert.equal(media.validateMediaUrl(source).hostname, "d.rapidcdn.app");
+  for (const url of ["https://rapidcdn.app/photo.jpg", "https://other.rapidcdn.app/photo.jpg", "https://d.rapidcdn.app.evil.test/photo.jpg"]) {
+    assert.throws(() => media.validateMediaUrl(url));
+  }
+  const item = { id: "post-1", type: "image", thumbnail: source, downloadUrl: source };
+  const result = tickets.authorizeMedia({
+    url: "https://instagram.com/example/", title: "Example", author: "Example", platform: "Instagram",
+    thumbnail: source, formats: [{ formatId: "1", ext: "jpg", type: "image", quality: "Photo", downloadUrl: source }],
+    profileData: { username: "example", fullName: "Example", avatarUrl: "", hdAvatarUrl: "", postsCount: "1", followersCount: "0", followingCount: "0", biography: "", posts: [item], stories: [], reels: [], highlights: [] },
+  });
+  assert.equal(result.formats.length, 1);
+  assert.equal(result.profileData.posts.length, 1);
+  assert.match(result.profileData.posts[0].downloadUrl, /^\/api\/download\?ticket=/);
+  assert.match(result.profileData.posts[0].thumbnail, /^\/api\/proxy\?ticket=/);
+});
 test("HTML and SVG are never accepted as media even with an image MIME type", () => {
   assert.throws(() => media.mediaKind(Buffer.from("<html><script>alert(1)</script>")));
   assert.throws(() => media.mediaKind(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')));
