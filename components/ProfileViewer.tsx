@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ProfileData, ProfileMediaItem, MediaResult } from "@/lib/instagramExtractor";
 import { useLanguage } from "./LanguageProvider";
 import {
@@ -31,7 +31,86 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
   const [activeTab, setActiveTab] = useState<"posts" | "stories" | "highlights" | "reels">(
     profile.stories.length > 0 ? "stories" : "posts"
   );
-  const [zoomModalOpen, setZoomModalOpen] = useState(false);
+  const [postsDisplayed, setPostsDisplayed] = useState<ProfileMediaItem[]>([]);
+  const [reelsDisplayed, setReelsDisplayed] = useState<ProfileMediaItem[]>([]);
+  const [postsIndex, setPostsIndex] = useState(0);
+  const [reelsIndex, setReelsIndex] = useState(0);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingReels, setLoadingReels] = useState(false);
+  const [postsCursor, setPostsCursor] = useState<string | undefined>(undefined);
+  const [reelsCursor, setReelsCursor] = useState<string | undefined>(undefined);
+  const loadMorePostsRef = useRef<HTMLDivElement>(null);
+  const loadMoreReelsRef = useRef<HTMLDivElement>(null);
+
+  // Initialize displayed items
+  useEffect(() => {
+    // show first batch (12) for posts and reels
+    const initialBatch = 12;
+    setPostsDisplayed(profile.posts.slice(0, initialBatch));
+    setPostsIndex(initialBatch);
+    setReelsDisplayed(profile.reels.slice(0, initialBatch));
+    setReelsIndex(initialBatch);
+  }, [profile.posts, profile.reels]);
+
+  // Intersection observers for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          if (entry.target === loadMorePostsRef.current) {
+            loadMorePosts();
+          } else if (entry.target === loadMoreReelsRef.current) {
+            loadMoreReels();
+          }
+        }
+      });
+    }, { rootMargin: "200px" });
+    if (loadMorePostsRef.current) observer.observe(loadMorePostsRef.current);
+    if (loadMoreReelsRef.current) observer.observe(loadMoreReelsRef.current);
+    return () => observer.disconnect();
+  }, [loadMorePostsRef, loadMoreReelsRef, postsIndex, reelsIndex, profile.posts, profile.reels]);
+
+  const loadMorePosts = async () => {
+    if (loadingPosts) return;
+    // Stop if no more items and no cursor
+    if (!postsCursor && postsIndex >= profile.posts.length) return;
+    setLoadingPosts(true);
+    try {
+      const res = await fetch(
+        `/api/load-more?username=${encodeURIComponent(profile.username)}&type=posts${postsCursor ? `&cursor=${encodeURIComponent(postsCursor)}` : ''}`
+      );
+      if (!res.ok) throw new Error('Failed to load more posts');
+      const data: { items: any[]; nextCursor?: string } = await res.json();
+      setPostsDisplayed(prev => [...prev, ...data.items]);
+      setPostsIndex(prev => prev + data.items.length);
+      setPostsCursor(data.nextCursor);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const loadMoreReels = async () => {
+    if (loadingReels) return;
+    if (!reelsCursor && reelsIndex >= profile.reels.length) return;
+    setLoadingReels(true);
+    try {
+      const res = await fetch(
+        `/api/load-more?username=${encodeURIComponent(profile.username)}&type=reels${reelsCursor ? `&cursor=${encodeURIComponent(reelsCursor)}` : ''}`
+      );
+      if (!res.ok) throw new Error('Failed to load more reels');
+      const data: { items: any[]; nextCursor?: string } = await res.json();
+      setReelsDisplayed(prev => [...prev, ...data.items]);
+      setReelsIndex(prev => prev + data.items.length);
+      setReelsCursor(data.nextCursor);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingReels(false);
+    }
+  };
+
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const handleDownload = (downloadUrl: string, filename: string, ext = "jpg") => {
@@ -256,7 +335,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
       {activeTab === "posts" && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {samplePosts.map((item, idx) => (
+            {postsDisplayed.map((item, idx) => (
               <div
                 key={item.id || idx}
                 className="bg-white rounded-2xl border border-gray-100 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group"
@@ -323,8 +402,9 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 </div>
               </div>
             ))}
+            </div>
+            <div ref={loadMorePostsRef} />
           </div>
-        </div>
       )}
 
       {/* ================= TAB 2: STORIES GRID (Screenshot 3) ================= */}
@@ -456,7 +536,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
       {activeTab === "reels" && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {samplePosts.map((item, idx) => (
+            {reelsDisplayed.map((item, idx) => (
               <div
                 key={item.id || idx}
                 className="bg-white rounded-2xl border border-gray-100 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group"
@@ -513,7 +593,8 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+            <div ref={loadMoreReelsRef} />
         </div>
       )}
 

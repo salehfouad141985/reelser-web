@@ -456,7 +456,7 @@ function decodeSnapApp(args: string[]): string {
   return result;
 }
 
-async function fetchRawSnapsave(url: string): Promise<any[]> {
+async function fetchRawSnapsave(url: string, cursor?: string): Promise<{media: any[]; nextCursor?: string}> {
   try {
     const { $fetch } = await import("ofetch");
     const { load } = await import("cheerio");
@@ -478,7 +478,7 @@ async function fetchRawSnapsave(url: string): Promise<any[]> {
     });
 
     const encodedParts = raw.split("decodeURIComponent(escape(r))}(")[1]?.split("))")[0]?.split(",")?.map((v: string) => v.replace(/"/g, "").trim());
-    if (!encodedParts || encodedParts.length < 6) return [];
+    if (!encodedParts || encodedParts.length < 6) return { media: [], nextCursor: undefined };
 
     const decoded = decodeSnapApp(encodedParts);
     const html = decoded.split('getElementById("download-section").innerHTML = "')[1]?.split('"; document.getElementById("inputData").remove(); ')[0]?.replace(/\\(\\)?/g, "");
