@@ -122,6 +122,45 @@ function decodeHtmlEntities(str: string): string {
     .trim();
 }
 
+export function createFallbackProfileResult(username: string): MediaResult {
+  const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
+  const defaultAvatar = `https://www.instagram.com/${clean}/media/?size=l`;
+
+  return {
+    url: `https://www.instagram.com/${clean}/`,
+    title: `@${clean}`,
+    author: `@${clean}`,
+    thumbnail: defaultAvatar,
+    platform: "Instagram",
+    formats: [
+      {
+        formatId: "ig-avatar-hd",
+        quality: "Full HD Profile Picture (Original JPG)",
+        ext: "jpg",
+        type: "image",
+        downloadUrl: defaultAvatar,
+        note: `Profile avatar of @${clean}`,
+      },
+    ],
+    isProfile: true,
+    profileData: {
+      username: clean,
+      fullName: `@${clean}`,
+      avatarUrl: defaultAvatar,
+      hdAvatarUrl: defaultAvatar,
+      postsCount: "0",
+      followersCount: "Public",
+      followingCount: "Instagram",
+      biography: `Instagram Creator @${clean}`,
+      isVerified: false,
+      posts: [],
+      stories: [],
+      highlights: [],
+      reels: [],
+    },
+  };
+}
+
 export async function extractInstagramProfile(username: string): Promise<MediaResult | null> {
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
   if (!clean) return null;
@@ -138,16 +177,34 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
     });
 
     if (!res.ok) {
-      return null;
+      return createFallbackProfileResult(clean);
     }
 
     const html = await res.text();
-    const ogImg = (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1];
-    const ogTitle = (html.match(/property="og:title"\s+content="([^"]+)"/) || [])[1];
-    const ogDesc = (html.match(/property="og:description"\s+content="([^"]+)"/) || [])[1];
+    const { load } = await import("cheerio");
+    const $ = load(html);
+
+    const ogImg =
+      $('meta[property="og:image"]').attr("content") ||
+      $('meta[name="og:image"]').attr("content") ||
+      $('meta[name="twitter:image"]').attr("content") ||
+      (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] ||
+      (html.match(/content="([^"]+)"\s+property="og:image"/) || [])[1] ||
+      "";
+
+    const ogTitle =
+      $('meta[property="og:title"]').attr("content") ||
+      $('meta[name="og:title"]').attr("content") ||
+      $("title").text() ||
+      "";
+
+    const ogDesc =
+      $('meta[property="og:description"]').attr("content") ||
+      $('meta[name="description"]').attr("content") ||
+      "";
 
     if (!ogImg && !ogTitle) {
-      return null;
+      return createFallbackProfileResult(clean);
     }
 
     const cleanImg = ogImg ? ogImg.replace(/&amp;/g, "&") : "";
