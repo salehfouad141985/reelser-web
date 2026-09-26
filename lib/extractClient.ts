@@ -11,8 +11,15 @@ export async function requestExtract(
   tab: string,
   fallbackMessage: string,
   request: typeof fetch = fetch,
+  wait: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)),
 ): Promise<MediaResult> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const retry = async (attempt: number) => {
+    if (attempt === 2) return false;
+    await wait(attempt === 0 ? 750 : 1500);
+    return true;
+  };
+
+  for (let attempt = 0; attempt < 3; attempt++) {
     let response: Response;
     try {
       response = await request("/api/extract", {
@@ -22,7 +29,7 @@ export async function requestExtract(
         cache: "no-store",
       });
     } catch {
-      if (attempt === 0) continue;
+      if (await retry(attempt)) continue;
       throw new Error(fallbackMessage);
     }
 
@@ -30,19 +37,19 @@ export async function requestExtract(
     try {
       body = await response.json();
     } catch {
-      if (attempt === 0) continue;
-      throw new Error(fallbackMessage);
+      if ((response.ok || response.status >= 500 || response.status === 408) && await retry(attempt)) continue;
+      throw new Error(`${fallbackMessage} (HTTP ${response.status})`);
     }
 
     if (!body || typeof body !== "object") {
-      if (attempt === 0) continue;
-      throw new Error(fallbackMessage);
+      if ((response.ok || response.status >= 500 || response.status === 408) && await retry(attempt)) continue;
+      throw new Error(`${fallbackMessage} (HTTP ${response.status})`);
     }
     if (!response.ok || body.success !== true) {
       throw new Error(typeof body.error === "string" && body.error ? body.error : fallbackMessage);
     }
     if (!body.data || typeof body.data !== "object") {
-      if (attempt === 0) continue;
+      if (await retry(attempt)) continue;
       throw new Error(fallbackMessage);
     }
     return body.data;
