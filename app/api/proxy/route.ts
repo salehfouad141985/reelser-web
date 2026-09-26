@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const upstreamUrl = decodeURIComponent(rawUrl);
+    const upstreamUrl = rawUrl;
     const domain = new URL(upstreamUrl).hostname;
 
     const headers: Record<string, string> = {
