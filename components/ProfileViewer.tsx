@@ -28,7 +28,9 @@ interface ProfileViewerProps {
 
 export function ProfileViewer({ profile, media }: ProfileViewerProps) {
   const { t, isRtl } = useLanguage();
-  const [activeTab, setActiveTab] = useState<"posts" | "stories" | "highlights" | "reels">("posts");
+  const [activeTab, setActiveTab] = useState<"posts" | "stories" | "highlights" | "reels">(
+    profile.stories.length > 0 ? "stories" : "posts"
+  );
   const [zoomModalOpen, setZoomModalOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -116,7 +118,7 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 className="w-full h-full rounded-full object-cover bg-gray-100"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
-                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='%23ccc'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3C/svg%3E";
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
                 }}
               />
             </div>
@@ -538,6 +540,10 @@ export function ProfileViewer({ profile, media }: ProfileViewerProps) {
                 src={profile.hdAvatarUrl}
                 alt={profile.fullName}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
+                }}
               />
             </div>
 

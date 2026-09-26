@@ -124,7 +124,7 @@ function decodeHtmlEntities(str: string): string {
 
 export function createFallbackProfileResult(username: string): MediaResult {
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
-  const defaultAvatar = `https://www.instagram.com/${clean}/media/?size=l`;
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&background=dc2743&color=fff&size=400&bold=true&rounded=true`;
 
   return {
     url: `https://www.instagram.com/${clean}/`,
@@ -340,7 +340,7 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
     try {
       const { snapsave } = await import("snapsave-media-downloader");
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout story extraction")), 5000);
+        setTimeout(() => reject(new Error("Timeout story extraction")), 9000);
       });
 
       const res: any = await Promise.race([
@@ -351,10 +351,12 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
 
       if (mediaData && Array.isArray(mediaData.media) && mediaData.media.length > 0) {
         const mediaList = mediaData.media;
+        const realAvatar = mediaData.preview || mediaList[0]?.thumbnail || mediaList[0]?.url;
+
         const items: ProfileMediaItem[] = mediaList.map((m: any, i: number) => ({
           id: `story-${i}`,
           type: m.type === "video" || (m.url && m.url.includes(".mp4")) ? "video" : "image",
-          thumbnail: m.thumbnail || m.url,
+          thumbnail: m.thumbnail || m.url || realAvatar,
           downloadUrl: m.url,
           caption: `@${username} Story #${i + 1}`,
           likes: "HD",
@@ -367,6 +369,18 @@ export async function extractInstagramMedia(inputUrl: string): Promise<MediaResu
           profileResult.profileData.stories = items;
           profileResult.profileData.posts = items;
           profileResult.profileData.reels = items;
+          profileResult.profileData.postsCount = `${mediaList.length}`;
+          if (realAvatar) {
+            profileResult.profileData.avatarUrl = realAvatar;
+            profileResult.profileData.hdAvatarUrl = realAvatar;
+          }
+        }
+
+        if (realAvatar) {
+          profileResult.thumbnail = realAvatar;
+          if (profileResult.formats[0]) {
+            profileResult.formats[0].downloadUrl = realAvatar;
+          }
         }
 
         mediaList.forEach((item: any, idx: number) => {
