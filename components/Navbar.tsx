@@ -4,77 +4,173 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "./LanguageProvider";
-import { AVAILABLE_LOCALES, Locale } from "@/lib/i18n";
-import { Video, Image as ImageIcon, Music, UserCheck, Menu, X, Globe, ChevronDown } from "lucide-react";
+import { AVAILABLE_LOCALES } from "@/lib/i18n";
+import {
+  Video,
+  Image as ImageIcon,
+  Music,
+  UserCheck,
+  Menu,
+  X,
+  ChevronDown,
+  ExternalLink,
+  Film,
+  Sparkles,
+  Share2,
+} from "lucide-react";
 
 export function Navbar() {
-  const { locale, setLocale, t, currentLocaleInfo } = useLanguage();
+  const { locale, setLocale, t, currentLocaleInfo, isRtl } = useLanguage();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
 
   const navItems = [
-    { href: "/reels", label: t("tabReels"), icon: Video },
-    { href: "/story-saver", label: t("tabStory"), icon: Video },
-    { href: "/photo-downloader", label: t("tabPhoto"), icon: ImageIcon },
-    { href: "/audio-downloader", label: t("tabAudio"), icon: Music },
-    { href: "/profile-downloader", label: t("tabProfile"), icon: UserCheck },
+    {
+      href: "/reels",
+      label: t("navReels") || "ريلز وفيديو (Reels / IG Video)",
+      icon: Film,
+      isExternal: false,
+    },
+    {
+      href: "/story-saver",
+      label: t("navStories") || "ستوري (Stories & Viewer)",
+      icon: Video,
+      isExternal: false,
+    },
+    {
+      href: "/photo-downloader",
+      label: t("navPhotos") || "صور (Photos)",
+      icon: ImageIcon,
+      isExternal: false,
+    },
+    {
+      href: "/profile-downloader",
+      label: t("navAvatar") || "صورة البروفايل (IG Avatar / DP)",
+      icon: UserCheck,
+      isExternal: false,
+    },
+    {
+      href: "/audio-downloader",
+      label: t("navAudio") || "صوت (Audio MP3)",
+      icon: Music,
+      isExternal: false,
+    },
+    {
+      href: "https://saveyou2be.com/facebook",
+      label: t("navFacebook") || "تحميل فيسبوك (Facebook Downloader)",
+      icon: Share2,
+      isExternal: true,
+      highlight: true,
+    },
   ];
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-md bg-white/90 border-b border-gray-100 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] flex items-center justify-center text-white shadow-md shadow-pink-500/20 group-hover:scale-105 transition-transform">
-              <Video className="w-5 h-5 fill-white/20" />
+    <header className="sticky top-0 z-50 shadow-md bg-gradient-to-r from-[#1d4ed8] via-[#0284c7] to-[#0891b2] text-white">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-2">
+          {/* Logo & Brand (Matching InstaSuperSave format) */}
+          <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/15 border border-white/30 backdrop-blur-xs flex items-center justify-center text-white shadow-sm group-hover:bg-white/25 transition-all">
+              <div className="relative">
+                <Video className="w-5 h-5 fill-white/20 text-white" />
+                <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-pink-400 border border-white" />
+              </div>
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] bg-clip-text text-transparent">
-                Reelser
-              </span>
-              <span className="text-[10px] text-gray-600 font-medium -mt-1 tracking-wider uppercase">
-                Instagram Downloader
+              <div className="flex items-center gap-1 font-black text-xl sm:text-2xl tracking-tight leading-none text-white">
+                <span>REELSER</span>
+              </div>
+              <span className="text-[10px] text-cyan-100 font-semibold tracking-wider uppercase opacity-90">
+                SuperSave Downloader
               </span>
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1 lg:gap-2">
+          {/* Desktop Navigation Bar */}
+          <nav className="hidden xl:flex items-center gap-1 lg:gap-1.5 flex-1 justify-center max-w-4xl mx-2">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = !item.isExternal && pathname === item.href;
+
+              if (item.isExternal) {
+                return (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="تحميل فيديوهات فيسبوك مجاناً عبر SaveYou2be"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-white/15 hover:bg-white/25 text-white border border-white/30 shadow-xs hover:scale-105 active:scale-95"
+                  >
+                    <Icon className="w-3.5 h-3.5 text-blue-200" />
+                    <span>{item.label}</span>
+                    <ExternalLink className="w-3 h-3 text-cyan-200 opacity-80" />
+                  </a>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     isActive
-                      ? "text-pink-600 bg-pink-50"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/80"
+                      ? "bg-white/25 text-white shadow-inner font-extrabold border border-white/30"
+                      : "text-white/90 hover:text-white hover:bg-white/15"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5 opacity-90" />
                   <span>{item.label}</span>
                 </Link>
               );
             })}
           </nav>
 
-          {/* Right Actions: Language Switcher */}
-          <div className="flex items-center gap-3">
+          {/* Medium Screens Navigation (Compact) */}
+          <nav className="hidden md:flex xl:hidden items-center gap-1 flex-1 justify-center">
+            {navItems.slice(0, 5).map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    isActive
+                      ? "bg-white/25 text-white font-extrabold"
+                      : "text-white/90 hover:text-white hover:bg-white/15"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{item.label.split("(")[0].trim()}</span>
+                </Link>
+              );
+            })}
+            <a
+              href="https://saveyou2be.com/facebook"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30"
+            >
+              <span>Facebook</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </nav>
+
+          {/* Right Actions: Language Switcher & Mobile Menu Button */}
+          <div className="flex items-center gap-2 shrink-0">
             {/* Language Selector Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-white bg-white/15 border border-white/30 rounded-xl hover:bg-white/25 transition-all cursor-pointer backdrop-blur-xs shadow-xs"
                 aria-expanded={langMenuOpen}
               >
                 <span>{currentLocaleInfo.flag}</span>
                 <span className="hidden sm:inline">{currentLocaleInfo.nativeName}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                <ChevronDown className="w-3 h-3 text-white/80" />
               </button>
 
               {langMenuOpen && (
@@ -83,7 +179,11 @@ export function Navbar() {
                     className="fixed inset-0 z-40"
                     onClick={() => setLangMenuOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-xl z-50 py-1 max-h-80 overflow-y-auto">
+                  <div
+                    className={`absolute ${
+                      isRtl ? "left-0" : "right-0"
+                    } mt-2 w-48 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 py-1.5 max-h-80 overflow-y-auto text-gray-900 animate-in fade-in zoom-in-95`}
+                  >
                     {AVAILABLE_LOCALES.map((item) => (
                       <button
                         key={item.code}
@@ -91,16 +191,16 @@ export function Navbar() {
                           setLocale(item.code);
                           setLangMenuOpen(false);
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${
-                          locale === item.code ? "text-pink-600 font-bold bg-pink-50/50" : "text-gray-700"
+                        className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-left hover:bg-gray-50 transition-colors cursor-pointer ${
+                          locale === item.code ? "text-blue-600 font-bold bg-blue-50/70" : "text-gray-700"
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          <span>{item.flag}</span>
+                          <span className="text-sm">{item.flag}</span>
                           <span>{item.nativeName}</span>
                         </span>
                         {locale === item.code && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+                          <span className="w-2 h-2 rounded-full bg-blue-600" />
                         )}
                       </button>
                     ))}
@@ -113,7 +213,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-hidden"
+              className="md:hidden p-2 rounded-xl text-white hover:bg-white/20 focus:outline-hidden transition-colors cursor-pointer"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -124,19 +224,39 @@ export function Navbar() {
 
       {/* Mobile Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white px-4 pt-2 pb-4 space-y-1 shadow-lg">
+        <div className="md:hidden border-t border-white/15 bg-gradient-to-b from-[#1d4ed8] to-[#0369a1] px-4 pt-3 pb-5 space-y-1.5 shadow-xl animate-in slide-in-from-top-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = !item.isExternal && pathname === item.href;
+
+            if (item.isExternal) {
+              return (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className="w-4 h-4 text-cyan-200" />
+                    <span>{item.label}</span>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-cyan-200" />
+                </a>
+              );
+            }
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold ${
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isActive
-                    ? "text-pink-600 bg-pink-50"
-                    : "text-gray-700 hover:bg-gray-50"
+                    ? "bg-white/25 text-white border border-white/30 shadow-inner"
+                    : "text-white/90 hover:bg-white/15 hover:text-white"
                 }`}
               >
                 <Icon className="w-4 h-4" />
