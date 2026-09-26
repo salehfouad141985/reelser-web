@@ -129,10 +129,12 @@ export async function extractInstagramProfile(username: string): Promise<MediaRe
   try {
     const res = await fetch(`https://www.instagram.com/${clean}/`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
       },
+      next: { revalidate: 300 },
     });
 
     if (!res.ok) {
