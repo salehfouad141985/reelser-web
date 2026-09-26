@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Readable, Transform } from "node:stream";
+import { spawn } from "node:child_process";
+import ffmpegPath from "ffmpeg-static";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +19,68 @@ export async function GET(req: NextRequest) {
     const cleanTitle = rawTitle.replace(/[\x00-\x1f\x7f/\\?%*:|"<>]/g, "_").slice(0, 100);
     const filename = `${cleanTitle}.${ext}`;
 
+    // Special Case: MP3 Audio Extraction using ffmpeg
+    if (ext === "mp3") {
+      try {
+        const binary = ffmpegPath || "ffmpeg";
+        const ffmpegArgs = [
+          "-headers",
+          "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36\r\n",
+          "-i",
+          url,
+          "-vn",
+          "-acodec",
+          "libmp3lame",
+          "-b:a",
+          "192k",
+          "-f",
+          "mp3",
+          "pipe:1",
+        ];
+
+        const ffmpegProc = spawn(/*turbopackIgnore: true*/ binary, ffmpegArgs, {
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+
+        const responseHeaders = new Headers({
+          "Content-Type": "audio/mpeg",
+          "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+          "X-Content-Type-Options": "nosniff",
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        });
+
+        const webStream = new ReadableStream({
+          start(controller) {
+            ffmpegProc.stdout.on("data", (chunk) => {
+              controller.enqueue(chunk);
+            });
+            ffmpegProc.stdout.on("end", () => {
+              controller.close();
+            });
+            ffmpegProc.stdout.on("error", (err) => {
+              controller.error(err);
+            });
+            ffmpegProc.on("error", (err) => {
+              controller.error(err);
+            });
+          },
+          cancel() {
+            try {
+              ffmpegProc.kill("SIGKILL");
+            } catch {}
+          },
+        });
+
+        return new NextResponse(webStream, {
+          status: 200,
+          headers: responseHeaders,
+        });
+      } catch (err) {
+        console.error("FFmpeg conversion error, falling back to direct stream:", err);
+      }
+    }
+
+    // Direct Video / Photo streaming
     const headers: Record<string, string> = {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -42,7 +105,11 @@ export async function GET(req: NextRequest) {
     }
 
     let contentType = upstreamRes.headers.get("content-type") || "";
-    if (!contentType || contentType.includes("octet-stream") || contentType.includes("text/html")) {
+    if (
+      !contentType ||
+      contentType.includes("octet-stream") ||
+      contentType.includes("text/html")
+    ) {
       if (ext === "mp4") contentType = "video/mp4";
       else if (ext === "mp3") contentType = "audio/mpeg";
       else if (ext === "jpg" || ext === "jpeg") contentType = "image/jpeg";
