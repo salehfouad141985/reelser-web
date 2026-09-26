@@ -5,6 +5,7 @@ import { useLanguage } from "./LanguageProvider";
 import { AdBanner, useSiteSettings } from "./SiteSettings";
 import { MediaCard } from "./MediaCard";
 import { MediaResult } from "@/lib/instagramExtractor";
+import { requestExtract } from "@/lib/extractClient";
 import { Clipboard, Download, Loader2, Sparkles, X, Video, Image as ImageIcon, Music, UserCheck, AlertCircle } from "lucide-react";
 
 interface HeroSectionProps {
@@ -68,22 +69,11 @@ export function HeroSection({
     setMediaResult(null);
 
     try {
-      const res = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), tab: activeTab }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to extract Instagram media");
-      }
-
-      setMediaResult(data.data);
+      setMediaResult(await requestExtract(url.trim(), activeTab, t("Download failed. Try again.")));
     } catch (err) {
       setError(
         (err instanceof Error ? err.message : "") ||
-          "Could not download this link. Please ensure it is a public Instagram post or account and try again."
+          t("Download failed. Try again.")
       );
     } finally {
       setLoading(false);
