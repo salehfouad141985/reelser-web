@@ -1,6 +1,7 @@
 "use client";
 
 import { saveMedia } from "@/lib/downloadClient";
+import { mergeProfileItems, requestProfilePage, type Section } from "@/lib/profileClient";
 import React, { useState, useEffect, useRef } from "react";
 import { ProfileData } from "@/lib/instagramExtractor";
 import { useLanguage } from "./LanguageProvider";
@@ -24,11 +25,45 @@ interface ProfileViewerProps {
   profile: ProfileData;
 }
 
-export function ProfileViewer({ profile }: ProfileViewerProps) {
+export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
+  const [profile, setProfile] = useState(initialProfile);
   const { t, isRtl } = useLanguage();
   const [activeTab, setActiveTab] = useState<"posts" | "stories" | "highlights" | "reels">(
-    profile.stories.length > 0 ? "stories" : "posts"
+    profile.initialSection || (profile.stories.length > 0 ? "stories" : "posts")
   );
+  const [pageLoading, setPageLoading] = useState<Section | null>(null);
+  const [pageError, setPageError] = useState<{ section: Section; message: string } | null>(null);
+  const pageRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => { pageRequest.current?.abort(); }, []);
+  const fetchPage = async (section: Section) => {
+    if (pageRequest.current || profile[section].length >= 5000) return;
+    const controller = new AbortController();
+    pageRequest.current = controller;
+    setPageLoading(section);
+    setPageError(null);
+    try {
+      const page = await requestProfilePage(profile.username, section, profile.pagination?.[section]?.cursor || null, controller.signal);
+      if (controller.signal.aborted) return;
+      setProfile(previous => ({ ...previous, [section]: mergeProfileItems(previous[section], page.items),
+        pagination: { ...previous.pagination, [section]: { loaded: true, cursor: page.nextCursor } } }));
+      if (section === "posts") setPostsLimit(limit => Math.max(limit, profile.posts.length + page.items.length));
+      if (section === "reels") setReelsLimit(limit => Math.max(limit, profile.reels.length + page.items.length));
+    } catch (error) {
+      if (!controller.signal.aborted) setPageError({ section, message: error instanceof Error ? error.message : "Could not load more results. Try again." });
+    } finally {
+      if (pageRequest.current === controller) { pageRequest.current = null; setPageLoading(null); }
+    }
+  };
+  const selectTab = (section: "posts" | "stories" | "reels" | "highlights") => {
+    pageRequest.current?.abort();
+    pageRequest.current = null;
+    setPageLoading(null);
+    setPageError(null);
+    setActiveTab(section);
+    if (profile.source === "selfHosted" && section !== "highlights" && !profile.pagination?.[section]?.loaded) void fetchPage(section);
+  };
+  const loaded = (section: Section) => profile.source !== "selfHosted" || profile.pagination?.[section]?.loaded;
+  const remoteMore = (section: Section) => profile.source === "selfHosted" && Boolean(profile.pagination?.[section]?.cursor) && profile[section].length < 5000;
   const dialogRef = useRef<HTMLDivElement>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [zoomModalOpen, setZoomModalOpen] = useState(false);
@@ -38,13 +73,13 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
   const loadMoreReelsRef = useRef<HTMLDivElement>(null);
   const postsDisplayed = profile.posts.slice(0, postsLimit);
   const reelsDisplayed = profile.reels.slice(0, reelsLimit);
-  const hasMorePosts = postsLimit < profile.posts.length;
-  const hasMoreReels = reelsLimit < profile.reels.length;
+  const hasMorePosts = postsLimit < profile.posts.length || remoteMore("posts");
+  const hasMoreReels = reelsLimit < profile.reels.length || remoteMore("reels");
 
   // The provider returns a finite batch without continuation cursors.
   // Reveal that batch progressively instead of requesting a nonexistent endpoint.
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
+    if (profile.source === "selfHosted" || typeof IntersectionObserver === "undefined") return;
     const target = activeTab === "posts" ? loadMorePostsRef.current
       : activeTab === "reels" ? loadMoreReelsRef.current : null;
     if (!target) return;
@@ -59,7 +94,7 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
     }, { rootMargin: "200px" });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [activeTab, postsLimit, reelsLimit, profile.posts.length, profile.reels.length]);
+  }, [activeTab, postsLimit, reelsLimit, profile.posts.length, profile.reels.length, profile.source]);
 
   useEffect(() => {
     if (!zoomModalOpen) return;
@@ -92,6 +127,17 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
   return (
     <div className="w-full max-w-4xl mx-auto mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 text-left" dir={isRtl ? "rtl" : "ltr"}>
       {downloadError && <p role="alert" className="text-red-700 text-center">{downloadError}</p>}
+      {pageLoading === activeTab && <p role="status" className="text-center">{t("Loading results...")}</p>}
+      {pageError?.section === activeTab && <div role="alert" className="text-center text-red-700">
+        <p>{t(pageError.message)}</p>
+        <button type="button" disabled={pageLoading !== null} onClick={() => void fetchPage(pageError.section)} className="px-4 py-2 rounded-xl bg-gray-100">{t("Try again")}</button>
+      </div>}
+      {activeTab !== "highlights" && profile[activeTab].length >= 5000 && <p role="status">{t("Result limit reached. Start a new search to refresh the results.")}</p>}
+      {profile.mediaCoverage === "partial" && (
+        <p role="status" className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {t("These results may not include all posts, reels or active stories. Try a direct link to retrieve a missing item.")}
+        </p>
+      )}
       {/* Title */}
       <div className="text-center">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -231,7 +277,7 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => selectTab(tab.id)}
                   className={`flex items-center gap-2 py-3 px-3 sm:px-5 font-black text-xs sm:text-sm uppercase tracking-wider transition-all border-b-2 cursor-pointer ${
                     isSelected
                       ? "border-gray-900 text-gray-900"
@@ -320,11 +366,11 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
             ))}
             </div>
             {hasMorePosts && <div ref={loadMorePostsRef} className="text-center">
-              <button type="button" onClick={() => setPostsLimit(limit => limit + 12)} className="px-4 py-2 rounded-xl bg-gray-100 font-bold">
+              <button type="button" disabled={pageLoading !== null} onClick={() => postsLimit < profile.posts.length ? setPostsLimit(limit => limit + 12) : void fetchPage("posts")} className="px-4 py-2 rounded-xl bg-gray-100 font-bold">
                 {t("Show more")}
               </button>
             </div>}
-            {profile.posts.length === 0 && <p className="text-center text-gray-500 py-8">{t("No posts available to display.")}</p>}
+            {loaded("posts") && profile.posts.length === 0 && !pageLoading && <p className="text-center text-gray-500 py-8">{t("No posts available to display.")}</p>}
           </div>
       )}
 
@@ -377,7 +423,7 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : loaded("stories") && !pageLoading ? (
             <div className="bg-white border border-gray-100 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-4 shadow-sm">
               <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
                 <Clock className="w-8 h-8" />
@@ -391,21 +437,21 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
               <div className="pt-2 flex justify-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setActiveTab("posts")}
+                  onClick={() => selectTab("posts")}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
                 >
                   {t("View Posts")}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("reels")}
+                  onClick={() => selectTab("reels")}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-pink-700 bg-pink-50 hover:bg-pink-100 transition-colors cursor-pointer"
                 >
                   {t("View Reels")}
                 </button>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -515,11 +561,11 @@ export function ProfileViewer({ profile }: ProfileViewerProps) {
             ))}
             </div>
             {hasMoreReels && <div ref={loadMoreReelsRef} className="text-center">
-              <button type="button" onClick={() => setReelsLimit(limit => limit + 12)} className="px-4 py-2 rounded-xl bg-gray-100 font-bold">
+              <button type="button" disabled={pageLoading !== null} onClick={() => reelsLimit < profile.reels.length ? setReelsLimit(limit => limit + 12) : void fetchPage("reels")} className="px-4 py-2 rounded-xl bg-gray-100 font-bold">
                 {t("Show more")}
               </button>
             </div>}
-            {profile.reels.length === 0 && <p className="text-center text-gray-500 py-8">{t("No reels available to display.")}</p>}
+            {loaded("reels") && profile.reels.length === 0 && !pageLoading && <p className="text-center text-gray-500 py-8">{t("No reels available to display.")}</p>}
         </div>
       )}
 

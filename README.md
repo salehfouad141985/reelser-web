@@ -30,7 +30,11 @@ Before upgrading a deployment that used the old defaults, rotate the signing sec
 
 The JSON store uses exclusive directory locks and atomic replacement. A process crash can leave a `.json.lock` directory: stop all workers, verify no writer remains, restore the file if necessary, then remove only the stale lock. Monitor storage errors and keep backups. This is a single-host design, **not** a distributed database or a network-filesystem locking protocol. Multi-host/serverless deployment needs a shared transactional database and distributed rate/concurrency limits first.
 
-## Production startup
+## Optional self-hosted profile source
+
+The Python service in [`services/instagram-source`](services/instagram-source/README.md) supports independent posts, reels and active stories plus real continuation pages. It requires an operator-created Instagram session and a shared service secret. Enable with `REELSER_PROFILE_SOURCE=selfHosted` only after running the service and validating real results. It is disabled by default; no live Instagram verification has been performed without a session. See its README for local/Docker setup, managed-hosting connectivity and limits.
+
+## Web server startup
 
 The build emits standalone output. Copy `public` and `.next/static` into the corresponding standalone paths and run `node .next/standalone/server.js`, supplying environment variables at runtime. Build on the target operating system so `ffmpeg-static` matches the host. Configure the front proxy to overwrite the selected IP header, enforce body/request timeouts and serve HTTPS. Do not expose the data volume publicly.
 

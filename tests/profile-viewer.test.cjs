@@ -71,3 +71,22 @@ test("available stories select the stories tab without showing posts", () => {
   assert.match(html, /Instagram Story/);
   assert.doesNotMatch(html, /Post caption 1|No Active Stories/);
 });
+
+test("multiple stories all render and partial results are disclosed", () => {
+  const html = render({ stories: [item(1), item(2), item(3)], mediaCoverage: "partial" });
+  assert.equal((html.match(/alt="Instagram Story"/g) || []).length, 3);
+  assert.match(html, /These results may not include all posts, reels or active stories/);
+});
+
+test("self-hosted reels select their own tab and expose a remote next page", () => {
+  const html = render({ source: "selfHosted", initialSection: "reels", reels: [{ ...item(1), type: "video" }],
+    pagination: { reels: { loaded: true, cursor: "next-page" }, posts: { loaded: false, cursor: null } } });
+  assert.match(html, /Instagram Reel/);
+  assert.match(html, /Show more/);
+  assert.doesNotMatch(html, /No reels available/);
+});
+
+test("unloaded sections do not claim that no media exists", () => {
+  const html = render({ source: "selfHosted", initialSection: "stories", pagination: { stories: { loaded: false, cursor: null } } });
+  assert.doesNotMatch(html, /No Active Stories/);
+});

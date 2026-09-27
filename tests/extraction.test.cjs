@@ -15,6 +15,7 @@ test("post results keep photos out of reels and posts out of stories", async () 
   try {
     const result = await extractInstagramMedia("@example");
     assert.equal(result.profileData.posts.length, 2);
+    assert.equal(result.profileData.mediaCoverage, "partial");
     assert.equal(result.profileData.reels.length, 1);
     assert.equal(result.profileData.reels[0].type, "video");
     assert.equal(result.profileData.stories.length, 0);
@@ -44,6 +45,7 @@ test("active stories appear alongside posts and reels", async () => {
   try {
     const result = await extractInstagramMedia("@example");
     assert.equal(result.profileData.posts.length, 2);
+    assert.equal(result.profileData.mediaCoverage, "partial");
     assert.equal(result.profileData.reels.length, 1);
     assert.equal(result.profileData.stories.length, 2);
     assert.equal(result.formats.length, 4);

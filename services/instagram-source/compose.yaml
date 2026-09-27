@@ -1,0 +1,19 @@
+services:
+  instagram-source:
+    build: .
+    restart: unless-stopped
+    environment:
+      REELSER_SOURCE_TOKEN: ${REELSER_SOURCE_TOKEN:?Set a random secret of at least 32 characters}
+    ports:
+      - "127.0.0.1:8010:8010"
+    volumes:
+      - instagram-session:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  instagram-session:

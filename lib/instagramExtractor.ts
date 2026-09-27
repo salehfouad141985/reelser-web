@@ -60,6 +60,10 @@ export interface ProfileData {
   stories: ProfileMediaItem[];
   highlights: ProfileHighlightItem[];
   reels: ProfileMediaItem[];
+  mediaCoverage?: "partial";
+  source?: "selfHosted";
+  initialSection?: "posts" | "reels" | "stories";
+  pagination?: Partial<Record<"posts" | "reels" | "stories", { loaded: boolean; cursor: string | null }>>;
 }
 
 export interface MediaResult {
@@ -570,6 +574,7 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
         profileResult.profileData.posts = posts;
         profileResult.profileData.reels = posts.filter(item => item.isVideo);
         profileResult.profileData.stories = stories;
+        profileResult.profileData.mediaCoverage = "partial";
         if (posts.length && (profileResult.profileData.postsCount === "0" || profileResult.profileData.postsCount === "Public")) {
           profileResult.profileData.postsCount = `${posts.length}`;
         }
@@ -691,6 +696,7 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
           isVerified: false,
           posts: [],
           stories: items,
+          mediaCoverage: "partial",
           highlights: [],
           reels: [],
         },

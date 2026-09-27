@@ -1,6 +1,7 @@
 import type { Locale } from "./i18n";
 export const UI_TEXT: Record<Locale, Record<string, string>> = {
   "en": {
+    "These results may not include all posts, reels or active stories. Try a direct link to retrieve a missing item.": "These results may not include all posts, reels or active stories. Try a direct link to retrieve a missing item.",
     "Search result": "Search result",
     "Zoom avatar": "Zoom avatar",
     "Open in Instagram": "Open in Instagram",
@@ -35,6 +36,11 @@ export const UI_TEXT: Record<Locale, Record<string, string>> = {
     "HIGHLIGHTS": "Story Highlights"
   },
   "ar": {
+    "Loading results...": "جارٍ جلب النتائج...",
+    "Try again": "إعادة المحاولة",
+    "Could not load more results. Try again.": "تعذّر جلب المزيد من النتائج. حاول مجددًا.",
+    "Result limit reached. Start a new search to refresh the results.": "تم بلوغ حد العرض. ابدأ بحثًا جديدًا لتحديث النتائج.",
+    "These results may not include all posts, reels or active stories. Try a direct link to retrieve a missing item.": "قد لا تشمل هذه النتائج جميع المنشورات أو الريلز أو القصص النشطة. جرّب الرابط المباشر لجلب عنصر غير ظاهر.",
     "Search result": "نتيجة البحث",
     "Zoom avatar": "تكبير الصورة",
     "Open in Instagram": "فتح في إنستغرام",
