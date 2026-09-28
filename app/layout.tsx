@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s | Reelser",
   },
   description:
-    "Free online Instagram downloader. Save Instagram Reels, Videos, Stories, Photos, and Audio in high-definition MP4/JPG without watermark or login.",
+    "Download public Instagram Reels, videos, stories, photos, and audio with Reelser. Free online tools for your phone or computer, with no registration.",
   keywords: [
     "instagram reels download",
     "instagram video downloader",
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "Reelser - Free Instagram Reels & Video Downloader",
     description: "Download Instagram Reels & Videos in source quality without watermark or login.",
   },
@@ -87,12 +87,7 @@ export default function RootLayout({
         "@id": "https://reelser.com/#website",
         url: "https://reelser.com",
         name: "Reelser",
-        description: "Best Instagram Reels & Video Downloader in source quality",
-        potentialAction: {
-          "@type": "SearchAction",
-          target: "https://reelser.com/?url={search_term_string}",
-          "query-input": "required name=search_term_string",
-        },
+        description: "Free online tools to download public Instagram media.",
       },
       {
         "@type": "WebApplication",

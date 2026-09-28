@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/pageMetadata";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/privacy" },
-  title: "Privacy Policy",
-  description: "Privacy Policy of Reelser - How we protect your data.",
-};
+export const metadata = pageMetadata(
+  "/privacy",
+  "Privacy Policy",
+  "Learn how Reelser processes submitted links, usernames, and temporary media data, and read about cookies and third-party services.",
+);
 
 export default function PrivacyPage() {
   return (

@@ -1,17 +1,14 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/pageMetadata";
 import { HeroSection } from "@/components/HeroSection";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { HowToSection } from "@/components/HowToSection";
 import { FaqSection } from "@/components/FaqSection";
 
-export const metadata: Metadata = {
-  title: "Instagram Profile Picture Downloader (DP) - View & Save Full Size",
-  description:
-    "View and download any Instagram profile picture (DP) in full resolution HD. Completely anonymous, free, and works without an Instagram account.",
-  alternates: {
-    canonical: "https://reelser.com/profile-downloader",
-  },
-};
+export const metadata = pageMetadata(
+  "/profile-downloader",
+  "Instagram Profile Picture Downloader",
+  "View and download profile pictures from public Instagram accounts. Enter a username or profile link to save the image available from the source.",
+);
 
 export default function ProfileDownloaderPage() {
   return (
@@ -19,7 +16,7 @@ export default function ProfileDownloaderPage() {
       <HeroSection
         initialTab="profile"
         customTitle="Instagram Profile Picture (DP) Downloader"
-        customDescription="Enlarge and download any public Instagram avatar or profile picture in original HD resolution."
+        customDescription="View and save a public Instagram profile picture in the resolution available from the source."
       />
       <FeaturesSection />
       <HowToSection />

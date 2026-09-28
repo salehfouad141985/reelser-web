@@ -45,7 +45,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/story-saver" className="hover:text-pink-400 transition-colors">
-                  Instagram Story & Highlights Saver
+                  Instagram Story Saver
                 </Link>
               </li>
               <li>

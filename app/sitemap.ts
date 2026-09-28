@@ -2,7 +2,6 @@ import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://reelser.com";
-  const now = new Date();
 
   const coreRoutes = [
     { path: "", priority: 1.0, changeFrequency: "daily" as const },
@@ -18,7 +17,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return coreRoutes.map((r) => ({
     url: `${baseUrl}${r.path}`,
-    lastModified: now,
     changeFrequency: r.changeFrequency,
     priority: r.priority,
   }));

@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/pageMetadata";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/dmca" },
-  title: "DMCA & Copyright Compliance",
-  description: "DMCA and copyright notice for Reelser.",
-};
+export const metadata = pageMetadata(
+  "/dmca",
+  "DMCA & Copyright Compliance",
+  "Read Reelser's copyright policy and learn how copyright owners can submit a notice about content processed through the service.",
+);
 
 export default function DmcaPage() {
   return (

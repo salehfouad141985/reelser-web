@@ -1,17 +1,14 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/pageMetadata";
 import { HeroSection } from "@/components/HeroSection";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { HowToSection } from "@/components/HowToSection";
 import { FaqSection } from "@/components/FaqSection";
 
-export const metadata: Metadata = {
-  title: "Instagram Audio Downloader - Extract Reels Audio & Music to MP3",
-  description:
-    "Extract and download audio tracks, background music, and sounds from Instagram Reels and videos in high-quality 192kbps MP3 format.",
-  alternates: {
-    canonical: "https://reelser.com/audio-downloader",
-  },
-};
+export const metadata = pageMetadata(
+  "/audio-downloader",
+  "Instagram Audio Downloader - Reels to MP3",
+  "Extract audio from public Instagram Reels and videos as MP3 files. Use Reelser to save available music, speech, and other audio to your device.",
+);
 
 export default function AudioDownloaderPage() {
   return (
@@ -19,7 +16,7 @@ export default function AudioDownloaderPage() {
       <HeroSection
         initialTab="audio"
         customTitle="Instagram Audio & MP3 Downloader"
-        customDescription="Extract original background songs, voice tracks, and audio sounds from any Instagram Reel or Video in clean MP3 format."
+        customDescription="Extract available audio from public Instagram Reels and videos and save it as an MP3 file."
       />
       <FeaturesSection />
       <HowToSection />

@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/pageMetadata";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/terms" },
-  title: "Terms of Service",
-  description: "Terms and Conditions of using Reelser.",
-};
+export const metadata = pageMetadata(
+  "/terms",
+  "Terms of Service",
+  "Read the terms for using Reelser, including permitted use, user responsibilities, and service limitations.",
+);
 
 export default function TermsPage() {
   return (

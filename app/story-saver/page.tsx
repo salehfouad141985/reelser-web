@@ -1,17 +1,14 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/pageMetadata";
 import { HeroSection } from "@/components/HeroSection";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { HowToSection } from "@/components/HowToSection";
 import { FaqSection } from "@/components/FaqSection";
 
-export const metadata: Metadata = {
-  title: "Instagram Story Saver - Download Instagram Stories & Highlights HD",
-  description:
-    "Save Instagram stories and highlights anonymously and in original high quality. 100% free online Story Saver for iPhone, Android, and PC.",
-  alternates: {
-    canonical: "https://reelser.com/story-saver",
-  },
-};
+export const metadata = pageMetadata(
+  "/story-saver",
+  "Instagram Story Saver",
+  "View and download available stories from public Instagram accounts. Save story photos and videos to your phone or computer with Reelser.",
+);
 
 export default function StorySaverPage() {
   return (
@@ -19,7 +16,7 @@ export default function StorySaverPage() {
       <HeroSection
         initialTab="story"
         customTitle="Instagram Story Saver"
-        customDescription="Download Instagram Stories and Highlights directly to your gallery in full resolution before they disappear after 24 hours."
+        customDescription="View and save available photos and videos from public Instagram stories before they expire."
       />
       <FeaturesSection />
       <HowToSection />
