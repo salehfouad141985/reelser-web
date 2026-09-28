@@ -178,6 +178,28 @@ test("media connection tries only public IPv4 and IPv6 DNS answers", async () =>
   finally { dnsMock.mock.restore(); requestMock.mock.restore(); }
 });
 
+test("denied media URLs return an actionable client error instead of a gateway error", async () => {
+  const https = require("node:https");
+  const { EventEmitter } = require("node:events");
+  const { Readable } = require("node:stream");
+  const requestMock = mock.method(https, "get", (_url, _options, callback) => {
+    const request = new EventEmitter();
+    queueMicrotask(() => {
+      const response = Readable.from([]);
+      response.statusCode = 403;
+      response.headers = {};
+      callback(response);
+    });
+    return request;
+  });
+  try {
+    await assert.rejects(
+      () => media.fetchMedia("https://cdn.iqsaved.com/avatar.jpg", AbortSignal.timeout(1000)),
+      error => error.status === 422 && /Extract it again/.test(error.message),
+    );
+  } finally { requestMock.mock.restore(); }
+});
+
 test("HTML image responses are rejected by the proxy route", async () => {
   const result = tickets.authorizeMedia({ url: "test", title: "test", author: "test", platform: "Instagram", formats: [], thumbnail: "https://cdninstagram.com/a" });
   const fetch = mock.method(media, "fetchMedia", async () => Buffer.from("<html>active content</html>"));

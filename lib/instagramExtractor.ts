@@ -1,3 +1,5 @@
+import { fetchMedia, mediaKind } from "./safeMedia";
+
 // Bounded source responses and real cancellation, including the response body.
 async function fetchSource(url: string, options: RequestInit): Promise<Response> {
   const response = await fetch(url, { ...options, redirect: "error" });
@@ -379,8 +381,28 @@ export async function extractInstagramProfile(username: string, signal: AbortSig
     }
 
     const fullName = directMeta?.fullName || publicMeta?.fullName || clean;
-    const avatarUrl = directMeta?.avatarUrl || publicMeta?.avatarUrl || "/icon.svg";
-    const hdAvatarUrl = directMeta?.hdAvatarUrl || publicMeta?.hdAvatarUrl || avatarUrl;
+    let avatarUrl = directMeta?.avatarUrl || publicMeta?.avatarUrl || "";
+    let hdAvatarUrl = directMeta?.hdAvatarUrl || publicMeta?.hdAvatarUrl || avatarUrl;
+    // The public viewer sometimes publishes an avatar on a CDN that denies
+    // downloads. Verify that fallback source before offering it to visitors.
+    if (!directMeta && avatarUrl) {
+      let isViewerCdn = false;
+      try {
+        const host = new URL(avatarUrl).hostname;
+        isViewerCdn = host === "iqsaved.com" || host.endsWith(".iqsaved.com");
+      } catch {}
+      if (isViewerCdn) {
+        try {
+          const bytes = await fetchMedia(avatarUrl, AbortSignal.any([signal, AbortSignal.timeout(3500)]), 1024 * 1024);
+          if (mediaKind(bytes).type !== "image") throw new Error("Invalid avatar image");
+        } catch {
+          signal.throwIfAborted();
+          avatarUrl = "";
+          hdAvatarUrl = "";
+        }
+      }
+    }
+    avatarUrl ||= "/icon.svg";
     const postsCount = publicMeta?.postsCount || directMeta?.postsCount || "0";
     const followersCount = publicMeta?.followersCount || directMeta?.followersCount || "Public";
     const followingCount = publicMeta?.followingCount || directMeta?.followingCount || "Instagram";
@@ -398,7 +420,7 @@ export async function extractInstagramProfile(username: string, signal: AbortSig
       },
     ] : [];
 
-    if (avatarUrl && avatarUrl !== hdAvatarUrl) {
+    if (avatarUrl !== "/icon.svg" && avatarUrl !== hdAvatarUrl) {
       formats.push({
         formatId: "ig-avatar-sd",
         quality: "Standard Profile Picture (JPG)",
@@ -545,7 +567,7 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
   // If this is a profile or username lookup (not a single post/reel or direct story url)
   if (username && !isPostOrReel && !cleanUrl.includes("/stories/")) {
     let profileResult = await extractInstagramProfile(username, signal);
-    if (!profileResult || profileResult.formats.length === 0) {
+    if (!profileResult) {
       profileResult = createFallbackProfileResult(username);
     }
 

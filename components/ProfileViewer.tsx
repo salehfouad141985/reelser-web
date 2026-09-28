@@ -168,14 +168,16 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
             </div>
 
             {/* Expand / Zoom Button */}
-            <button
-              type="button"
-              title={t("Zoom avatar")}
-              onClick={() => setZoomModalOpen(true)}
-              className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-[#00d084] text-white flex items-center justify-center shadow-md hover:bg-emerald-600 transition-colors border-2 border-white cursor-pointer"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
+            {profile.avatarDownloadUrl && (
+              <button
+                type="button"
+                title={t("Zoom avatar")}
+                onClick={() => setZoomModalOpen(true)}
+                className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-[#00d084] text-white flex items-center justify-center shadow-md hover:bg-emerald-600 transition-colors border-2 border-white cursor-pointer"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Account Details & Stats */}
@@ -232,7 +234,7 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
             </div>
 
             {/* Quick Action: Download Avatar Button */}
-            <div className="pt-2 flex items-center justify-center sm:justify-start gap-3 flex-wrap">
+            {profile.avatarDownloadUrl && <div className="pt-2 flex items-center justify-center sm:justify-start gap-3 flex-wrap">
               <button
                 type="button"
                 onClick={() =>
@@ -261,7 +263,7 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                 <Maximize2 className="w-3.5 h-3.5" />
                 <span>{t("Zoom Avatar")}</span>
               </button>
-            </div>
+            </div>}
           </div>
         </div>
 

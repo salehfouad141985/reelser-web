@@ -71,13 +71,17 @@ export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32
           return;
         }
         if (status !== 200 || Number(response.headers["content-length"] || 0) > maxBytes) {
-          // Hostinger's gateway replaces upstream 502 JSON with an HTML error page.
           // Log only the host and status; media URLs can contain signed tokens.
           console.warn("Media fetch rejected upstream response", {
             host: url.hostname, status,
             oversized: Number(response.headers["content-length"] || 0) > maxBytes,
           });
-          response.destroy(); reject(new RequestError("Media unavailable or too large", 502)); return;
+          response.destroy();
+          // A rejected or expired source URL is a bad media link, not a gateway
+          // failure. A 422 lets the client show the JSON error through Hostinger.
+          const denied = status === 403 || status === 404;
+          reject(new RequestError(denied ? "Media link unavailable. Extract it again." : "Media unavailable or too large", denied ? 422 : 502));
+          return;
         }
         const chunks: Buffer[] = [];
         let size = 0;
