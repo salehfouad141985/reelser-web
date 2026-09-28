@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
       "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox",
       "Cache-Control": "private, no-store",
     } });
-  } catch (error) { return errorResponse(error); }
+  } catch (error) {
+    console.warn("Media download failed", error instanceof RequestError
+      ? { status: error.status, reason: error.message }
+      : { name: error instanceof Error ? error.name : "unknown", code: (error as NodeJS.ErrnoException)?.code || "unknown" });
+    return errorResponse(error);
+  }
   finally { release?.(); }
 }

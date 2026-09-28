@@ -71,6 +71,12 @@ export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32
           return;
         }
         if (status !== 200 || Number(response.headers["content-length"] || 0) > maxBytes) {
+          // Hostinger's gateway replaces upstream 502 JSON with an HTML error page.
+          // Log only the host and status; media URLs can contain signed tokens.
+          console.warn("Media fetch rejected upstream response", {
+            host: url.hostname, status,
+            oversized: Number(response.headers["content-length"] || 0) > maxBytes,
+          });
           response.destroy(); reject(new RequestError("Media unavailable or too large", 502)); return;
         }
         const chunks: Buffer[] = [];
@@ -80,10 +86,16 @@ export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32
           if (size > maxBytes) response.destroy(new RequestError("Media exceeds size limit", 413));
           else chunks.push(chunk);
         });
-        response.once("error", reject);
+        response.once("error", error => {
+          console.warn("Media fetch response error", { host: url.hostname, code: (error as NodeJS.ErrnoException).code || "unknown" });
+          reject(error);
+        });
         response.once("end", () => size ? resolve({ bytes: Buffer.concat(chunks) }) : reject(new RequestError("Empty media", 502)));
       });
-      request.once("error", reject);
+      request.once("error", error => {
+        console.warn("Media fetch connection error", { host: url.hostname, code: (error as NodeJS.ErrnoException).code || "unknown" });
+        reject(error);
+      });
     });
     if (result.bytes) return result.bytes;
     url = validateMediaUrl(new URL(result.location!, url).href);
