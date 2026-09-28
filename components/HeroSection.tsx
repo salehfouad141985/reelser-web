@@ -3,10 +3,12 @@
 import React, { useState } from "react";
 import { useLanguage } from "./LanguageProvider";
 import { AdBanner, useSiteSettings } from "./SiteSettings";
-import { MediaCard } from "./MediaCard";
+import dynamic from "next/dynamic";
 import { MediaResult } from "@/lib/instagramExtractor";
 import { requestExtract } from "@/lib/extractClient";
 import { Clipboard, Download, Loader2, Sparkles, X, Video, Image as ImageIcon, Music, UserCheck, AlertCircle } from "lucide-react";
+
+const MediaCard = dynamic(() => import("./MediaCard").then(module => module.MediaCard));
 
 interface HeroSectionProps {
   initialTab?: "reels" | "story" | "photo" | "audio" | "profile";
@@ -187,7 +189,7 @@ export function HeroSection({
 
         {/* Error message */}
         {error && (
-          <div className="mt-4 max-w-2xl mx-auto flex items-center gap-2.5 p-3.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl text-left animate-in fade-in">
+          <div role="alert" className="mt-4 max-w-2xl mx-auto flex items-center gap-2.5 p-3.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl text-left animate-in fade-in">
             <AlertCircle className="w-5 h-5 shrink-0 text-red-500" />
             <span>{error}</span>
           </div>

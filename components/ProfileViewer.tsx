@@ -115,13 +115,16 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
   }, [zoomModalOpen]);
 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const downloadPending = useRef(false);
 
   const handleDownload = async (downloadUrl: string, filename: string, _ext = "jpg") => {
+    if (downloadPending.current) return;
+    downloadPending.current = true;
     setDownloadError(null);
     setDownloadingId(downloadUrl);
     try { await saveMedia(downloadUrl, `${filename}.${_ext}`); }
-    catch (error) { setDownloadError(error instanceof Error ? error.message : "Download failed"); }
-    finally { setDownloadingId(null); }
+    catch (error) { setDownloadError(t(error instanceof Error ? error.message : "Download failed")); }
+    finally { downloadPending.current = false; setDownloadingId(null); }
   };
 
   return (
@@ -239,7 +242,7 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                     "jpg"
                   )
                 }
-                disabled={!profile.avatarDownloadUrl || downloadingId === profile.avatarDownloadUrl}
+                disabled={!profile.avatarDownloadUrl || downloadingId !== null}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-[#00d084] hover:bg-emerald-600 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
               >
                 <Download className="w-4 h-4" />
@@ -307,6 +310,8 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.thumbnail}
+                    loading="lazy"
+                    decoding="async"
                     alt={item.caption || "Instagram Post"}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -350,7 +355,8 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                           item.type === "video" ? "mp4" : "jpg"
                         )
                       }
-                      disabled={downloadingId === item.downloadUrl}
+                      disabled={downloadingId !== null}
+                      aria-busy={downloadingId === item.downloadUrl}
                       className="w-full py-2.5 px-4 rounded-xl font-black text-xs text-white bg-[#00d084] hover:bg-emerald-600 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
@@ -389,6 +395,8 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={story.thumbnail}
+                      loading="lazy"
+                      decoding="async"
                       alt="Instagram Story"
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -414,10 +422,12 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                           story.type === "video" ? "mp4" : "jpg"
                         )
                       }
+                      disabled={downloadingId !== null}
+                      aria-busy={downloadingId === story.downloadUrl}
                       className="w-full py-2.5 px-4 rounded-xl font-black text-xs text-white bg-[#00d084] hover:bg-emerald-600 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
-                      <span>{t("btnDownload")}</span>
+                      <span>{t(downloadingId === story.downloadUrl ? "Downloading..." : "btnDownload")}</span>
                     </button>
                   </div>
                 </div>
@@ -481,6 +491,8 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={hl.cover}
+                    loading="lazy"
+                    decoding="async"
                     alt={hl.title}
                     referrerPolicy="no-referrer"
                     className="w-full h-full rounded-full object-cover bg-gray-100"
@@ -512,6 +524,8 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.thumbnail}
+                    loading="lazy"
+                    decoding="async"
                     alt="Instagram Reel"
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -550,10 +564,12 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
                           "mp4"
                         )
                       }
+                      disabled={downloadingId !== null}
+                      aria-busy={downloadingId === item.downloadUrl}
                       className="w-full py-2.5 px-4 rounded-xl font-black text-xs text-white bg-[#00d084] hover:bg-emerald-600 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
-                      <span>{t("btnDownload")}</span>
+                      <span>{t(downloadingId === item.downloadUrl ? "Downloading..." : "btnDownload")}</span>
                     </button>
                   </div>
                 </div>
@@ -592,7 +608,7 @@ export function ProfileViewer({ profile: initialProfile }: ProfileViewerProps) {
             </h3>
 
             {/* High Res Avatar */}
-            <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden shadow-md bg-gray-900">
+            <div className="w-full max-w-64 aspect-square mx-auto rounded-2xl overflow-hidden shadow-md bg-gray-900">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={profile.hdAvatarUrl}

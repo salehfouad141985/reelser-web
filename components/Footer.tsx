@@ -26,7 +26,7 @@ export function Footer() {
             <p className="text-xs leading-relaxed text-gray-400">
               The world&apos;s leading fast & free Instagram media downloader. Save Reels, Stories, Photos, and Audio in available quality without watermark.
             </p>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
               <span>100% Free & No Registration</span>
             </div>
@@ -34,9 +34,9 @@ export function Footer() {
 
           {/* Dedicated Tools */}
           <div>
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
               Instagram Tools
-            </h4>
+            </h2>
             <ul className="space-y-2.5 text-xs">
               <li>
                 <Link href="/reels" className="hover:text-pink-400 transition-colors">
@@ -68,9 +68,9 @@ export function Footer() {
 
           {/* Sister Network & Partners */}
           <div>
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
               Multi-Platform Network
-            </h4>
+            </h2>
             <ul className="space-y-2.5 text-xs">
               <li>
                 <a
@@ -108,9 +108,9 @@ export function Footer() {
 
           {/* Legal & Terms */}
           <div>
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
               Legal & Policy
-            </h4>
+            </h2>
             <ul className="space-y-2.5 text-xs">
               <li>
                 <Link href="/terms" className="hover:text-gray-200 transition-colors">
@@ -132,7 +132,7 @@ export function Footer() {
         </div>
 
         {/* Disclaimer & Copyright */}
-        <div className="mt-12 pt-8 border-t border-gray-900 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-500">
+        <div className="mt-12 pt-8 border-t border-gray-900 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-400">
           <p className="text-center md:text-left max-w-2xl">
             {t("footerDisclaimer")}
           </p>

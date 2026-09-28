@@ -1,7 +1,7 @@
 "use client";
 
 import { saveMedia } from "@/lib/downloadClient";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { MediaResult, MediaFormat } from "@/lib/instagramExtractor";
 import { Download, Film, Music, Image as ImageIcon, Check } from "lucide-react";
 import { useLanguage } from "./LanguageProvider";
@@ -15,6 +15,7 @@ export function MediaCard({ media }: MediaCardProps) {
   const { t } = useLanguage();
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadingFormatId, setDownloadingFormatId] = useState<string | null>(null);
+  const downloadPending = useRef(false);
 
   // If the result is a full Instagram profile, render the StoriesIG Profile Viewer experience
   if (media.isProfile && media.profileData) {
@@ -35,11 +36,13 @@ export function MediaCard({ media }: MediaCardProps) {
   };
 
   const handleDownload = async (format: MediaFormat) => {
+    if (downloadPending.current) return;
+    downloadPending.current = true;
     setDownloadError(null);
     setDownloadingFormatId(format.formatId);
     try { await saveMedia(format.downloadUrl, media.title || "reelser-media"); }
-    catch (error) { setDownloadError(error instanceof Error ? error.message : "Download failed"); }
-    finally { setDownloadingFormatId(null); }
+    catch (error) { setDownloadError(t(error instanceof Error ? error.message : "Download failed")); }
+    finally { downloadPending.current = false; setDownloadingFormatId(null); }
   };
 
   return (
@@ -115,7 +118,8 @@ export function MediaCard({ media }: MediaCardProps) {
 
                     <button
                       onClick={() => handleDownload(fmt)}
-                      disabled={isDownloading}
+                      disabled={downloadingFormatId !== null}
+                      aria-busy={isDownloading}
                       className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] hover:opacity-95 shadow-md shadow-pink-500/20 active:scale-95 transition-all cursor-pointer"
                     >
                       {isDownloading ? (

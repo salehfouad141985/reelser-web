@@ -38,7 +38,7 @@ export function FeaturesSection() {
     <section className="py-16 md:py-24 bg-white border-t border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="text-xs font-bold uppercase tracking-wider text-pink-600 bg-pink-50 px-3 py-1 rounded-full">
+          <span className="text-xs font-bold uppercase tracking-wider text-pink-700 bg-pink-50 px-3 py-1 rounded-full">
             Top Quality & Security
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight mt-3">

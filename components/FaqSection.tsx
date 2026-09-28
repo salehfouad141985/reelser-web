@@ -40,7 +40,7 @@ export function FaqSection() {
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
-          <span className="text-xs font-bold uppercase tracking-wider text-pink-600 bg-pink-50 px-3 py-1 rounded-full">
+          <span className="text-xs font-bold uppercase tracking-wider text-pink-700 bg-pink-50 px-3 py-1 rounded-full">
             Answers & Clarity
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight mt-3">

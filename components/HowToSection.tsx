@@ -60,7 +60,7 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                 <Copy className="w-3.5 h-3.5" />
                 <span>{t("stepBadge1") || "Step 01"}</span>
               </span>
-              <span className="text-4xl font-black text-gray-200 group-hover:text-pink-200 transition-colors">
+              <span className="text-4xl font-black text-gray-600 group-hover:text-pink-700 transition-colors">
                 01
               </span>
             </div>
@@ -153,7 +153,7 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                 <Link2 className="w-3.5 h-3.5" />
                 <span>{t("stepBadge2") || "Step 02"}</span>
               </span>
-              <span className="text-4xl font-black text-pink-500/30 group-hover:text-pink-500/50 transition-colors">
+              <span className="text-4xl font-black text-pink-700 group-hover:text-pink-800 transition-colors">
                 02
               </span>
             </div>
@@ -175,7 +175,7 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                     <Sparkles className="w-3.5 h-3.5 text-pink-600 inline" />
                     <span>Reelser Search</span>
                   </div>
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-500">
+                  <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-600">
                     <span className="px-1.5 py-0.5 rounded bg-pink-100 text-pink-700 font-bold">Reels</span>
                     <span className="px-1.5 py-0.5 rounded bg-gray-100">Story</span>
                     <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-bold">@User</span>
@@ -224,7 +224,7 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                 <Download className="w-3.5 h-3.5" />
                 <span>{t("stepBadge3") || "Step 03"}</span>
               </span>
-              <span className="text-4xl font-black text-gray-200 group-hover:text-green-200 transition-colors">
+              <span className="text-4xl font-black text-gray-600 group-hover:text-green-700 transition-colors">
                 03
               </span>
             </div>
@@ -249,7 +249,7 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                     <span className="text-[11px] font-bold text-gray-900 block truncate">
                       Instagram Reel #MP4
                     </span>
-                    <span className="text-[10px] text-green-600 font-bold flex items-center gap-1">
+                    <span className="text-[10px] text-green-700 font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Ready for Download
                     </span>
                   </div>
@@ -271,13 +271,13 @@ export function HowToSection({ customTitle, customSubtitle }: HowToSectionProps)
                       <Music className="w-4 h-4" />
                       <span>{isRtl ? "تحميل الصوت النقي (MP3)" : "Download Clean Audio (MP3)"}</span>
                     </div>
-                    <span className="text-[10px] font-mono text-gray-400">192 kbps</span>
+                    <span className="text-[10px] font-mono text-gray-600">192 kbps</span>
                   </div>
                 </div>
 
                 {/* Security and Quality Trust Seals */}
                 <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-bold text-gray-500">
-                  <span className="text-green-600">✓ بدون علامة مائية</span>
+                  <span className="text-green-700">✓ بدون علامة مائية</span>
                   <span>•</span>
                   <span>مجاني 100%</span>
                   <span>•</span>
