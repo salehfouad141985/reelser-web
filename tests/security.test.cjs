@@ -59,8 +59,9 @@ test("corrupt storage is not reset and write failures propagate", () => {
 test("SSRF policy rejects local IPs, lookalike hosts, credentials and unsafe protocols", () => {
   for (const url of ["http://127.0.0.1/", "https://169.254.169.254/", "https://cdninstagram.com.evil.test/", "file:///etc/passwd", "https://user:pass@cdninstagram.com/", "https://cdninstagram.com:444/", "https://[::1]/"]) assert.throws(() => media.validateMediaUrl(url));
   assert.equal(media.validateMediaUrl("https://scontent.cdninstagram.com/image.jpg").hostname, "scontent.cdninstagram.com");
-  for (const ip of ["127.0.0.1", "10.0.0.1", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "::ffff:127.0.0.1"]) assert.equal(media.publicAddress(ip), false);
+  for (const ip of ["127.0.0.1", "10.0.0.1", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "::ffff:127.0.0.1", "fc00::1", "fe80::1", "2001:db8::1", "2002:c0a8:101::1", "2001:0::1"]) assert.equal(media.publicAddress(ip), false);
   assert.equal(media.publicAddress("8.8.8.8"), true);
+  assert.equal(media.publicAddress("2606:4700:4700::1111"), true);
 });
 test("SnapSave CDN media receives tickets only from its exact verified host", () => {
   const source = "https://d.rapidcdn.app/photo.jpg";
@@ -143,6 +144,38 @@ test("network connections reject private DNS answers and revalidate redirects", 
   await assert.rejects(() => media.fetchMedia("https://cdninstagram.com/a", AbortSignal.timeout(1000)), /Unsupported media/);
   assert.equal(connections, 1);
   dnsMock.mock.restore(); requestMock.mock.restore();
+});
+
+test("media connection tries only public IPv4 and IPv6 DNS answers", async () => {
+  const https = require("node:https");
+  const dns = require("node:dns");
+  const { EventEmitter } = require("node:events");
+  const { Readable } = require("node:stream");
+  const dnsMock = mock.method(dns, "lookup", (_host, options, callback) => {
+    assert.equal(options.family, 0);
+    callback(null, [
+      { address: "127.0.0.1", family: 4 },
+      { address: "2606:4700:4700::1111", family: 6 },
+      { address: "8.8.8.8", family: 4 },
+    ]);
+  });
+  const requestMock = mock.method(https, "get", (_url, options, callback) => {
+    assert.equal(options.autoSelectFamily, true);
+    const request = new EventEmitter();
+    queueMicrotask(() => options.lookup("cdninstagram.com", { all: true }, (error, addresses) => {
+      assert.ifError(error);
+      assert.deepEqual(addresses, [
+        { address: "2606:4700:4700::1111", family: 6 },
+        { address: "8.8.8.8", family: 4 },
+      ]);
+      const response = Readable.from([Buffer.from([255, 216, 255])]);
+      response.statusCode = 200; response.headers = {};
+      callback(response);
+    }));
+    return request;
+  });
+  try { assert.equal((await media.fetchMedia("https://cdninstagram.com/a", AbortSignal.timeout(1000))).length, 3); }
+  finally { dnsMock.mock.restore(); requestMock.mock.restore(); }
 });
 
 test("HTML image responses are rejected by the proxy route", async () => {

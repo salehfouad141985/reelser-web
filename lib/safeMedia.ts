@@ -1,10 +1,15 @@
 import https from "node:https";
 import dns from "node:dns";
-import { isIP } from "node:net";
+import { BlockList, isIP } from "node:net";
 import { RequestError } from "./requestPolicy";
 
 const HOSTS = ["cdninstagram.com", "fbcdn.net", "iqsaved.com"];
 const EXACT_HOSTS = new Set(["d.rapidcdn.app"]);
+const blockedIPv6 = new BlockList();
+// Do not let IPv6 transition addresses tunnel a private IPv4 destination.
+blockedIPv6.addSubnet("2001::", 32, "ipv6"); // Teredo
+blockedIPv6.addSubnet("2002::", 16, "ipv6"); // 6to4
+blockedIPv6.addSubnet("2001:db8::", 32, "ipv6"); // Documentation
 export function validateMediaUrl(raw: string) {
   let url: URL;
   try { url = new URL(raw); } catch { throw new RequestError("Invalid media URL"); }
@@ -15,7 +20,12 @@ export function validateMediaUrl(raw: string) {
   return url;
 }
 export function publicAddress(ip: string): boolean {
-  // Use IPv4 only; reject IPv6 rather than incompletely filtering mapped forms.
+  if (isIP(ip) === 6) {
+    // Native global-unicast IPv6 only. This excludes loopback, private, link-local,
+    // multicast, and IPv4-mapped addresses before the transition checks above.
+    const first = Number.parseInt(ip.split(":", 1)[0], 16);
+    return first >= 0x2000 && first <= 0x3fff && !blockedIPv6.check(ip, "ipv6");
+  }
   if (isIP(ip) !== 4) return false;
   const [a, b, c] = ip.split(".").map(Number);
   return !(a === 0 || a === 10 || a === 127 || a >= 224 ||
@@ -30,8 +40,8 @@ export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32
   for (let hop = 0; hop < 4; hop++) {
     signal.throwIfAborted();
     const result = await new Promise<{ location?: string; bytes?: Buffer }>((resolve, reject) => {
-      const request = https.get(url, {
-        signal, agent: false, family: 4,
+      const options: https.RequestOptions & { autoSelectFamily: boolean } = {
+        signal, agent: false, autoSelectFamily: true,
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
           "Accept-Encoding": "identity",
@@ -40,16 +50,18 @@ export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32
         },
         // Validate inside the connection's lookup: no second DNS resolution.
         lookup(hostname, options, callback) {
-          dns.lookup(hostname, { all: true, family: 4 }, (error, addresses) => {
+          dns.lookup(hostname, { all: true, family: 0 }, (error, addresses) => {
             if (error) return callback(error, "", 4);
-            if (!addresses.length || addresses.some(item => !publicAddress(item.address))) {
+            const allowed = addresses.filter(item => publicAddress(item.address));
+            if (!allowed.length) {
               return callback(new Error("Blocked network destination"), "", 4);
             }
-            if (options.all) callback(null, addresses);
-            else callback(null, addresses[0].address, 4);
+            if (options.all) callback(null, allowed);
+            else callback(null, allowed[0].address, allowed[0].family);
           });
         },
-      }, response => {
+      };
+      const request = https.get(url, options, response => {
         const status = response.statusCode || 502;
         if ([301, 302, 303, 307, 308].includes(status)) {
           const location = response.headers.location;
