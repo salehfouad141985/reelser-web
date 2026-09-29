@@ -3,7 +3,22 @@ import path from "node:path";
 import crypto from "node:crypto";
 
 export function dataDirectory() {
-  return path.resolve(process.env.REELSER_DATA_DIR || path.join(process.cwd(), "data"));
+  if (process.env.REELSER_DATA_DIR) {
+    try { fs.mkdirSync(process.env.REELSER_DATA_DIR, { recursive: true }); } catch {}
+    return path.resolve(process.env.REELSER_DATA_DIR);
+  }
+  const cwd = process.cwd();
+  // Hostinger: cwd = /home/u123456789/domains/reelser.com/hbuilds/versions/xxx
+  // البيانات داخل hbuilds تُحذف مع كل Deploy -> نستخدم مجلداً دائماً خارجها (نفس حل SaveYou2be)
+  if (cwd.includes("hbuilds/versions")) {
+    const domainDir = cwd.split("/hbuilds/")[0];
+    const persistentData = path.join(domainDir, "data");
+    try {
+      if (!fs.existsSync(persistentData)) fs.mkdirSync(persistentData, { recursive: true });
+      return persistentData;
+    } catch {}
+  }
+  return path.resolve(path.join(cwd, "data"));
 }
 
 // One local persistent volume shared by all Node workers. A crashed lock fails
