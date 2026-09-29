@@ -43,6 +43,24 @@ const DEFAULT_SETTINGS: AdminSettings = {
   max_downloads_per_ip_hour: 60,
 };
 
+const ACTIVITY_LOG_MAX_ENTRIES = 200;
+const configuredRetentionDays = Number(process.env.ACTIVITY_LOG_RETENTION_DAYS || "30");
+const ACTIVITY_LOG_RETENTION_DAYS = Number.isFinite(configuredRetentionDays)
+  ? Math.min(90, Math.max(1, Math.floor(configuredRetentionDays)))
+  : 30;
+
+function activityTimestamp(value: string): number {
+  const ts = Date.parse(value.includes("T") ? value : value.replace(" ", "T") + "Z");
+  return Number.isFinite(ts) ? ts : Date.now();
+}
+
+function minimizeActivities(activities: ActivityItem[]): ActivityItem[] {
+  const cutoff = Date.now() - ACTIVITY_LOG_RETENTION_DAYS * 86_400_000;
+  return activities
+    .filter((entry) => activityTimestamp(entry.timestamp) >= cutoff)
+    .slice(0, ACTIVITY_LOG_MAX_ENTRIES);
+}
+
 const DEFAULT_STATS: AdminStats = {
   totalExtractions: 0,
   successfulExtractions: 0,
@@ -87,7 +105,12 @@ function change<R>(fn: (data: AdminData) => R): R {
     }
     data.settings = { ...DEFAULT_SETTINGS, ...data.settings };
     data.sessions ??= {}; // Legacy JWTs are intentionally invalid after migration.
-    return fn(data);
+    // نفس minimizeActivityLogs في media-downloader-web — حد 200 واحتفاظ قابل للضبط
+    data.stats.recentActivities = minimizeActivities(data.stats.recentActivities);
+    const result = fn(data);
+    // تقليم ثانية بعد الكتابة لضمان عدم تجاوز الحد
+    data.stats.recentActivities = minimizeActivities(data.stats.recentActivities);
+    return result;
   });
 }
 
@@ -125,9 +148,9 @@ function recordActivity(type: ActivityItem["type"], success: boolean) {
         else stats.photoDownloads++;
       }
       stats.lastUpdated = new Date().toISOString();
-      stats.recentActivities = [{ id: crypto.randomUUID(), type, success,
+      stats.recentActivities = minimizeActivities([{ id: crypto.randomUUID(), type, success,
         title: type === "extract" ? "Media extraction" : "Media download", timestamp: stats.lastUpdated },
-        ...stats.recentActivities.map(item => ({ ...item, title: "Media request" }))].slice(0, 30);
+        ...stats.recentActivities.map(item => ({ ...item, title: "Media request" }))]);
     });
   } catch { console.error("Unable to persist request statistics"); }
 }
