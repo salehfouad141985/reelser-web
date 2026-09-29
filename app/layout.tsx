@@ -55,11 +55,13 @@ export const metadata: Metadata = {
     siteName: "Reelser",
     locale: "en_US",
     type: "website",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Reelser — Instagram Reels & Video Downloader" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Reelser - Free Instagram Reels & Video Downloader",
     description: "Download Instagram Reels & Videos in source quality without watermark or login.",
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,

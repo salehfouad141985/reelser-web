@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken, updateAdminSettings, updateAdminPassword, type AdminSettings } from "@/lib/adminStore";
 import { assertSameOrigin, errorResponse, readJson, RequestError } from "@/lib/requestPolicy";
+
+function containsDangerousBannerMarkup(html: string): boolean {
+  const lower = html.toLowerCase();
+  if (/<\s*script\b/i.test(html)) return true;
+  if (/\bon\w+\s*=/i.test(html)) return true;
+  if (/javascript\s*:/i.test(lower)) return true;
+  if (/data\s*:\s*text\/html/i.test(lower)) return true;
+  if (/<\s*iframe\b[^>]*\bsrc\s*=\s*["'][^"']*javascript:/i.test(lower)) return true;
+  if (/<\s*object\b/i.test(html) || /<\s*embed\b/i.test(html)) return true;
+  return false;
+}
 export async function POST(req: NextRequest) {
   try {
     assertSameOrigin(req);
@@ -18,7 +29,11 @@ export async function POST(req: NextRequest) {
       if (key in body) { if (typeof body[key] !== "boolean") throw new RequestError("Invalid setting"); update[key] = body[key]; }
     }
     for (const key of ["ad_top_banner_code", "ad_results_banner_code", "ad_bottom_banner_code"] as const) {
-      if (key in body) { if (typeof body[key] !== "string" || body[key].length > 8000) throw new RequestError("Invalid banner"); update[key] = body[key]; }
+      if (key in body) {
+        if (typeof body[key] !== "string" || body[key].length > 8000) throw new RequestError("Invalid banner");
+        if (containsDangerousBannerMarkup(body[key])) throw new RequestError("Banner contains disallowed markup or protocol");
+        update[key] = body[key];
+      }
     }
     if ("max_downloads_per_ip_hour" in body) {
       const value = body.max_downloads_per_ip_hour;

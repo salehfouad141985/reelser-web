@@ -46,7 +46,23 @@ export function acquireLease(kind: "extract" | "download" | "convert", limit: nu
 }
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) throw new RequestError("Invalid origin", 403);
+  if (!origin) return;
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host.toLowerCase();
+  } catch {
+    throw new RequestError("Invalid origin", 403);
+  }
+  // Behind Hostinger / reverse-proxy TLS termination the internal request.url
+  // is http:// while the browser sends Origin: https:// — hosts match but
+  // origins differ. Compare hosts, respecting X-Forwarded-* when present.
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim().toLowerCase();
+  const hostHeader = request.headers.get("host")?.split(",")[0]?.trim().toLowerCase();
+  const urlHost = new URL(request.url).host.toLowerCase();
+  const expectedHost = forwardedHost || hostHeader || urlHost;
+  if (originHost !== expectedHost && originHost !== urlHost) {
+    throw new RequestError("Invalid origin", 403);
+  }
 }
 export async function readJson(request: Request, maxBytes = 32768) {
   const reader = request.body?.getReader();
