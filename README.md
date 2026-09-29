@@ -22,7 +22,7 @@ Copy `.env.example` to `.env.local` for local development. In production, provid
 - `ADMIN_JWT_SECRET`: a fresh random secret of at least 32 characters. Despite the historical variable name, sessions now use opaque random tokens stored as HMAC hashes, not JWTs. Old JWTs are invalid.
 - `REELSER_ADMIN_PASS`: an initial password of at least 16 characters. It is used only when the store has no password. The old public default is rejected.
 - `REELSER_DATA_DIR`: an absolute path to a **persistent local volume shared by every worker on one host**. Defaults to `./data`. Do not put it inside a disposable release directory.
-- `REELSER_TRUSTED_IP_HEADER`: optional single-IP header overwritten by a trusted front proxy. Configure it only when direct access to the application is blocked and the proxy strips visitor-supplied copies. Otherwise quotas intentionally use a shared visitor bucket.
+- `REELSER_TRUSTED_IP_HEADER`: optional single-IP header overwritten by a trusted front proxy. Configure it only when direct access to the application is blocked and the proxy strips visitor-supplied copies. Otherwise all visitors share site-wide hourly ceilings (600 extractions, 600 downloads, and 6000 previews) instead of the per-visitor limits. Concurrency limits still apply.
 
 Administration fails closed without the secret. Existing non-default passwords retain compatibility; passwords are upgraded to the stronger hash when changed. Changing a password, rotating the secret or logging out revokes affected sessions. Sessions last one day.
 

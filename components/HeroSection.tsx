@@ -74,7 +74,7 @@ export function HeroSection({
       setMediaResult(await requestExtract(url.trim(), activeTab, t("Download failed. Try again.")));
     } catch (err) {
       setError(
-        (err instanceof Error ? err.message : "") ||
+        (err instanceof Error ? t(err.message) : "") ||
           t("Download failed. Try again.")
       );
     } finally {

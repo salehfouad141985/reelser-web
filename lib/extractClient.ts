@@ -37,6 +37,7 @@ export async function requestExtract(
     try {
       body = await response.json();
     } catch {
+      if (response.status === 429) throw new Error("Too many requests. Try again later.");
       if ((response.ok || response.status >= 500 || response.status === 408) && await retry(attempt)) continue;
       throw new Error(`${fallbackMessage} (HTTP ${response.status})`);
     }

@@ -79,3 +79,15 @@ test("does not retry a non-JSON 403 response", async () => {
   );
   assert.equal(calls, 1);
 });
+
+test("explains a non-JSON rate limit without sending repeated requests", async () => {
+  let calls = 0;
+  await assert.rejects(
+    requestExtract("@maoning_mfa", "reels", "Try again", async () => {
+      calls++;
+      return new Response("<html>Too many requests</html>", { status: 429 });
+    }),
+    { message: "Too many requests. Try again later." },
+  );
+  assert.equal(calls, 1);
+});

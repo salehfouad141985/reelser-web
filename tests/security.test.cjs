@@ -104,7 +104,17 @@ test("rate limits, concurrency limits and maintenance are enforced", () => {
   admin.updateAdminSettings({ maintenance_mode: true });
   assert.throws(() => policy.servicePolicy(new Request("https://reelser.com"), "extract"), error => error.status === 503);
   admin.updateAdminSettings({ maintenance_mode: false, max_downloads_per_ip_hour: 1 });
-  assert.throws(() => policy.servicePolicy(new Request("https://reelser.com"), "download"), error => error.status === 429);
+  const oldHeader = process.env.REELSER_TRUSTED_IP_HEADER;
+  process.env.REELSER_TRUSTED_IP_HEADER = "x-test-client-ip";
+  try {
+    const visitor = new Request("https://reelser.com", { headers: { "x-test-client-ip": "203.0.113.20" } });
+    policy.servicePolicy(visitor, "download");
+    assert.throws(() => policy.servicePolicy(visitor, "download"), error => error.status === 429);
+  } finally {
+    if (oldHeader === undefined) delete process.env.REELSER_TRUSTED_IP_HEADER;
+    else process.env.REELSER_TRUSTED_IP_HEADER = oldHeader;
+  }
+  for (let i = 0; i < 31; i++) policy.servicePolicy(new Request("https://reelser.com"), "extract");
   admin.updateAdminSettings({ max_downloads_per_ip_hour: 60 });
 });
 test("failed extraction does not fabricate original media", async () => {

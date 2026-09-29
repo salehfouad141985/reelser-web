@@ -27,8 +27,13 @@ export function rateLimit(key: string, limit: number, windowMs = 3600_000) {
 export function servicePolicy(request: Request, kind: "extract" | "download" | "proxy") {
   const settings = getAdminSettings();
   if (settings.maintenance_mode) throw new RequestError("Service temporarily unavailable for maintenance.", 503);
-  const limit = kind === "download" ? settings.max_downloads_per_ip_hour : kind === "extract" ? 30 : 600;
-  rateLimit(`${kind}:${clientKey(request)}`, limit);
+  const client = clientKey(request);
+  const visitorLimit = kind === "download" ? settings.max_downloads_per_ip_hour : kind === "extract" ? 30 : 600;
+  // Without a verified visitor IP, every visitor shares one bucket. Keep a
+  // separate, higher site-wide ceiling so normal traffic cannot exhaust an
+  // individual visitor's allowance for everybody else.
+  const limit = client === "shared" ? Math.max(visitorLimit, kind === "proxy" ? 6000 : 600) : visitorLimit;
+  rateLimit(`${kind}:${client}`, limit);
 }
 export function acquireLease(kind: "extract" | "download" | "convert", limit: number) {
   const id = crypto.randomUUID();
