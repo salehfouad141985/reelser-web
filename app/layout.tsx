@@ -46,6 +46,18 @@ export const metadata: Metadata = {
   publisher: "Reelser",
   alternates: {
     canonical: "https://reelser.com",
+    languages: {
+      "en": "https://reelser.com",
+      "ar": "https://reelser.com",
+      "es": "https://reelser.com",
+      "fr": "https://reelser.com",
+      "pt": "https://reelser.com",
+      "de": "https://reelser.com",
+      "tr": "https://reelser.com",
+      "id": "https://reelser.com",
+      "ru": "https://reelser.com",
+      "x-default": "https://reelser.com",
+    },
   },
   openGraph: {
     title: "Reelser - Instagram Reels & Video Downloader (source quality)",
@@ -90,6 +102,7 @@ export default function RootLayout({
         url: "https://reelser.com",
         name: "Reelser",
         description: "Free online tools to download public Instagram media.",
+        inLanguage: ["en", "ar", "es", "fr", "pt", "de", "tr", "id", "ru"],
       },
       {
         "@type": "WebApplication",
@@ -103,6 +116,22 @@ export default function RootLayout({
           price: "0",
           priceCurrency: "USD",
         },
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://reelser.com/#faq",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Is Reelser completely free to use?",
+            acceptedAnswer: { "@type": "Answer", text: "Yes, Reelser is 100% free with unlimited downloads and no subscription needed." },
+          },
+          {
+            "@type": "Question",
+            name: "Does Reelser work on iPhone and Android?",
+            acceptedAnswer: { "@type": "Answer", text: "Yes, Reelser works seamlessly in any browser on iPhone (Safari), Android (Chrome), Mac, and PC." },
+          },
+        ],
       },
     ],
   };

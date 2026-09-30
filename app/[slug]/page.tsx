@@ -24,6 +24,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const url = `https://reelser.com${canonicalPath(slug)}`;
+  const ogImage = { url: "/opengraph-image", width: 1200, height: 630, alt: config.metaTitle };
 
   return {
     title: config.metaTitle,
@@ -38,11 +39,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url,
       siteName: "Reelser",
       type: "website",
+      images: [ogImage],
     },
     twitter: {
       card: "summary_large_image",
       title: config.metaTitle,
       description: config.metaDescription,
+      images: ["/opengraph-image"],
     },
   };
 }
