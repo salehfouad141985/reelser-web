@@ -131,8 +131,55 @@ export function Footer() {
           </div>
         </div>
 
+        {/* Popular Programmatic SEO Topics & Tool Hubs */}
+        <div className="mt-12 pt-8 border-t border-gray-900">
+          <div className="text-center md:text-left mb-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              Popular Tools & Topics
+            </h3>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <Link href="/instagram-reels-without-watermark" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Reels Without Watermark
+            </Link>
+            <Link href="/instagram-to-mp4" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Instagram to MP4
+            </Link>
+            <Link href="/reels-download-hd" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Reels Download HD (1080p)
+            </Link>
+            <Link href="/storiesig-viewer" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              StoriesIG Viewer
+            </Link>
+            <Link href="/instagram-story-download-with-music" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Story Download with Music
+            </Link>
+            <Link href="/instagram-carousel-download" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Instagram Carousel Downloader
+            </Link>
+            <Link href="/instagram-audio-download" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Instagram Audio & MP3
+            </Link>
+            <Link href="/instagram-dp-download" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Profile Picture (DP) Full HD
+            </Link>
+            <Link href="/saveinsta-alternative" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              SaveInsta Alternative
+            </Link>
+            <Link href="/snapinsta-alternative" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              SnapInsta Alternative
+            </Link>
+            <Link href="/ssinstagram-alternative" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              SSInstagram Alternative
+            </Link>
+            <Link href="/save-instagram-reels" className="px-2.5 py-1 rounded-md bg-gray-900 text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors">
+              Save Reels to Camera Roll
+            </Link>
+          </div>
+        </div>
+
         {/* Disclaimer & Copyright */}
-        <div className="mt-12 pt-8 border-t border-gray-900 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-400">
+        <div className="mt-8 pt-8 border-t border-gray-900 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-400">
           <p className="text-center md:text-left max-w-2xl">
             {t("footerDisclaimer")}
           </p>

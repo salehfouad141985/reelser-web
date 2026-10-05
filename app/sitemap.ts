@@ -1,4 +1,5 @@
 import { MetadataRoute } from "next";
+import { REELSER_PSEO_PAGES } from "@/lib/pseo-data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://reelser.com";
@@ -15,10 +16,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/dmca", priority: 0.3, changeFrequency: "monthly" as const },
   ];
 
-  return coreRoutes.map((r) => ({
+  const coreEntries: MetadataRoute.Sitemap = coreRoutes.map((r) => ({
     url: `${baseUrl}${r.path}`,
     lastModified: new Date(),
     changeFrequency: r.changeFrequency,
     priority: r.priority,
   }));
+
+  const pseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_PSEO_PAGES).map((slug) => ({
+    url: `${baseUrl}/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: "weekly" as const,
+    priority: 0.8,
+  }));
+
+  return [...coreEntries, ...pseoEntries];
 }

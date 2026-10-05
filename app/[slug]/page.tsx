@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { canonicalPath } from "@/lib/pseoCanonical";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { REELSER_PSEO_PAGES } from "@/lib/pseo-data";
+import { HeroSection } from "@/components/HeroSection";
+import { PseoContent } from "@/components/PseoContent";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const url = `https://reelser.com${canonicalPath(slug)}`;
+  const url = `https://reelser.com/${slug}`;
   const ogImage = { url: "/opengraph-image", width: 1200, height: 630, alt: config.metaTitle };
 
   return {
@@ -58,5 +59,88 @@ export default async function PseoPage({ params }: PageProps) {
     notFound();
   }
 
-  permanentRedirect(canonicalPath(slug));
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": `https://reelser.com/${slug}#webpage`,
+        url: `https://reelser.com/${slug}`,
+        name: config.metaTitle,
+        description: config.metaDescription,
+        breadcrumb: {
+          "@id": `https://reelser.com/${slug}#breadcrumb`,
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `https://reelser.com/${slug}#breadcrumb`,
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: "https://reelser.com",
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: config.h1,
+            item: `https://reelser.com/${slug}`,
+          },
+        ],
+      },
+      {
+        "@type": "WebApplication",
+        "@id": `https://reelser.com/${slug}#app`,
+        name: config.h1,
+        url: `https://reelser.com/${slug}`,
+        applicationCategory: "MultimediaApplication",
+        operatingSystem: "All (iOS, Android, Windows, macOS, Linux)",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+        },
+      },
+      {
+        "@type": "HowTo",
+        "@id": `https://reelser.com/${slug}#howto`,
+        name: config.howToTitle,
+        step: config.howToSteps.map((step, idx) => ({
+          "@type": "HowToStep",
+          position: idx + 1,
+          name: step.title,
+          text: step.desc,
+        })),
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `https://reelser.com/${slug}#faq`,
+        mainEntity: config.faqs.map((faq) => ({
+          "@type": "Question",
+          name: faq.q,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: faq.a,
+          },
+        })),
+      },
+    ],
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <HeroSection
+        initialTab={config.category}
+        customTitle={config.h1}
+        customDescription={config.metaDescription}
+      />
+      <PseoContent config={config} />
+    </>
+  );
 }
