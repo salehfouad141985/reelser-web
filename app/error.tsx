@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function Error({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
@@ -19,12 +21,12 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
         >
           Try again
         </button>
-        <a
+        <Link
           href="/"
           className="rounded-full border border-zinc-300 px-6 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
         >
           Go home
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     if (typeof body.url !== "string" || body.url.length > 2048 || !isValidInstagramUrl(body.url)) {
       throw new RequestError("Please enter a valid Instagram URL or @username / أدخل رابط إنستغرام أو اسم حساب صالح");
     }
-    release = acquireLease("extract", 4);
+    release = acquireLease("extract", 20);
     const username = extractInstagramUsername(body.url);
     const input = body.tab === "story" && username ? `https://www.instagram.com/stories/${username}/` : body.url;
     const signal = AbortSignal.any([req.signal, AbortSignal.timeout(25000)]);
