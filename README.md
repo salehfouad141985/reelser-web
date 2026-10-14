@@ -59,6 +59,10 @@ At redeploy, review the selected Node.js version, build command, start command a
 
 ## Supported behavior and limitations
 
+### Source failure diagnostics
+
+SnapSave failures emit one JSON log line with `event=source_failure`, a random `operationId` for that upstream attempt, `provider`, `stage`, `reason`, `elapsedMs`, and, when available, `httpStatus`, an allow-listed `errorType` and `networkCode`. Stages distinguish transport, HTTP rejection, response body, encoding, decoding, HTML extraction and missing media. `reason=timeout` indicates a deadline; `reason=cancelled` is logged at informational level when a search is aborted. These records never contain submitted URLs/usernames, signed media links, source response bodies, request headers, exception messages or stacks. The ID identifies an upstream attempt, not a browser session. Inspect runtime logs after reproducing a failed public link to distinguish upstream availability from a changed response format.
+
 Profile pictures, posts and story links depend on upstream public sources. Missing metadata or a generated placeholder is never offered as an original download. A metadata-only success can provide an actual profile photo while posts remain unavailable. Photos are never put in the reels list. The source does not provide trustworthy pagination cursors: “Show more” reveals only the already returned batch. Highlights have an explicit empty state until a real extraction source is implemented. Quality depends on the source; MP3 conversion targets 192 kbps and cannot restore missing source detail.
 
 Maintenance blocks extraction/download/preview APIs and appears in the public UI. Advertisement settings are rendered in sandboxed frames without same-origin access; ad providers that require access to the parent page will not work. No Google Analytics script or fabricated rating schema is loaded. Activity records store generic event titles; legacy activity titles are scrubbed as new events are recorded. Temporary media URLs remain in the ticket store until expired entries are pruned by a subsequent extraction. See the privacy page for processing details.

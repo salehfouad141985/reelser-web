@@ -1,9 +1,16 @@
 import { fetchMedia, mediaKind } from "./safeMedia";
+import { SourceFetchError, sourceAttempt, type SourceStage } from "./sourceDiagnostics";
 
 // Bounded source responses and real cancellation, including the response body.
 async function fetchSource(url: string, options: RequestInit): Promise<Response> {
-  const response = await fetch(url, { ...options, redirect: "error" });
-  if (!response.ok || !response.body) throw new Error("Source unavailable");
+  let response: Response;
+  try { response = await fetch(url, { ...options, redirect: "error" }); }
+  catch (error) { throw new SourceFetchError("transport", "network_failure", undefined, error); }
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    throw new SourceFetchError("http", "http_status", response.status);
+  }
+  if (!response.body) throw new SourceFetchError("body", "missing_body", response.status);
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -13,10 +20,16 @@ async function fetchSource(url: string, options: RequestInit): Promise<Response>
       const { done, value } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > 2 * 1024 * 1024) { await reader.cancel(); throw new Error("Source response too large"); }
+      if (size > 2 * 1024 * 1024) {
+        await reader.cancel().catch(() => {});
+        throw new SourceFetchError("body", "response_too_large", response.status);
+      }
       chunks.push(value);
     }
     return new Response(Buffer.concat(chunks), { status: response.status, headers: response.headers });
+  } catch (error) {
+    if (error instanceof SourceFetchError) throw error;
+    throw new SourceFetchError("body", "body_read_failed", response.status, error);
   } finally { reader.releaseLock(); }
 }
 
@@ -199,6 +212,7 @@ async function fetchPublicProfileMetadata(username: string, signal: AbortSignal)
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
   if (!clean) return null;
 
+  const logFailure = sourceAttempt("profileViewer");
   try {
     const res = await fetchSource(`https://insta-stories-viewer.com/${encodeURIComponent(clean)}/`, {
       headers: {
@@ -253,8 +267,8 @@ async function fetchPublicProfileMetadata(username: string, signal: AbortSignal)
         isVerified,
       };
     }
-  } catch {
-    console.warn("fetchPublicProfileMetadata error:");
+  } catch (error) {
+    logFailure("metadata", "parse_failed", error, undefined, signal);
   }
   return null;
 }
@@ -263,6 +277,7 @@ export async function extractInstagramProfile(username: string, signal: AbortSig
   const clean = username.replace(/^@/, "").replace(/\/$/, "").trim();
   if (!clean) return null;
 
+  const logFailure = sourceAttempt("instagram");
   try {
     // 1. Fetch public profile metadata from residential viewer mirror
     const publicMetaPromise = fetchPublicProfileMetadata(clean, signal);
@@ -457,8 +472,8 @@ export async function extractInstagramProfile(username: string, signal: AbortSig
       isProfile: true,
       profileData,
     };
-  } catch {
-    console.warn("Instagram profile extraction error:");
+  } catch (error) {
+    logFailure("metadata", "parse_failed", error, undefined, signal);
     return null;
   }
 }
@@ -507,11 +522,16 @@ interface SnapsaveMediaItem {
 }
 
 async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<SnapsaveMediaItem[]> {
+  const logFailure = sourceAttempt("snapsave");
+  let stage: SourceStage = "request";
+  let httpStatus: number | undefined;
+  let requestSignal = signal;
   try {
     const { load } = await import("cheerio");
     const formData = new URLSearchParams();
     formData.append("url", url);
 
+    requestSignal = AbortSignal.any([signal, AbortSignal.timeout(9000)]);
     const response = await fetchSource("https://snapsave.app/action.php?lang=en", {
       method: "POST",
       headers: {
@@ -522,17 +542,27 @@ async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<Snaps
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
       body: formData,
-      signal: AbortSignal.any([signal, AbortSignal.timeout(9000)]),
+      signal: requestSignal,
     });
-
+    httpStatus = response.status;
+    stage = "encoding";
     const raw = await response.text();
     const encodedParts = raw.split("decodeURIComponent(escape(r))}(")[1]?.split("))")[0]?.split(",")?.map((v: string) => v.replace(/"/g, "").trim());
-    if (!encodedParts || encodedParts.length < 6) return [];
+    if (!encodedParts || encodedParts.length < 6) {
+      logFailure(stage, "encoding_missing", undefined, httpStatus, requestSignal);
+      return [];
+    }
 
+    stage = "decode";
     const decoded = decodeSnapApp(encodedParts);
+    stage = "html";
     const html = decoded.split('getElementById("download-section").innerHTML = "')[1]?.split('"; document.getElementById("inputData").remove(); ')[0]?.replace(/\\(\\)?/g, "");
-    if (!html) return [];
+    if (!html) {
+      logFailure(stage, "html_missing", undefined, httpStatus, requestSignal);
+      return [];
+    }
 
+    stage = "media";
     const $ = load(html);
     const media: SnapsaveMediaItem[] = [];
 
@@ -549,9 +579,10 @@ async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<Snaps
       }
     });
 
+    if (!media.length) logFailure(stage, "no_media", undefined, httpStatus, requestSignal);
     return media;
-  } catch {
-    console.warn("fetchRawSnapsave error:");
+  } catch (error) {
+    logFailure(stage, "parse_failed", error, httpStatus, requestSignal);
     return [];
   }
 }
@@ -559,6 +590,7 @@ async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<Snaps
 export async function extractInstagramMedia(inputUrl: string, signal: AbortSignal = AbortSignal.timeout(25000)): Promise<MediaResult | null> {
   const cleanUrl = inputUrl.trim();
   if (!cleanUrl) return null;
+  const logFailure = sourceAttempt("snapsave");
 
   // Check if the input is a pure username or a profile URL
   const username = extractInstagramUsername(cleanUrl);
@@ -616,8 +648,8 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
           }
         });
       }
-    } catch {
-      console.warn("Snapsave profile lookup error:");
+    } catch (error) {
+      if (!signal.aborted) logFailure("media", "parse_failed", error);
     }
 
     signal.throwIfAborted();
@@ -733,8 +765,10 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
       platform: "Instagram",
       formats,
     };
-  } catch {
-    console.warn("Instagram extraction error:");
+  } catch (error) {
+    // The source attempt has already recorded timeout/cancellation; do not
+    // duplicate it at the outer extraction layer.
+    if (!signal.aborted) logFailure("media", "parse_failed", error);
     signal.throwIfAborted();
     return null;
   }
