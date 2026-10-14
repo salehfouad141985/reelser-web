@@ -3,6 +3,30 @@ const { test, mock } = require("node:test");
 const assert = require("node:assert/strict");
 const { extractInstagramMedia } = require("../lib/instagramExtractor.ts");
 const media = require("../lib/safeMedia.ts");
+const { normalizeInstagramMediaUrl, isValidInstagramUrl, extractInstagramShortcode } = require("../lib/instagramExtractor.ts");
+
+test("account-qualified media links validate and extract using the direct canonical path", async t => {
+  const input = "https://www.instagram.com/nasa/reel/DeTUk4sDSp-/?igsh=test";
+  assert.equal(isValidInstagramUrl(input), true);
+  assert.equal(extractInstagramShortcode(input), "DeTUk4sDSp-");
+  assert.equal(normalizeInstagramMediaUrl(input), "https://www.instagram.com/reel/DeTUk4sDSp-/?igsh=test");
+  for (const type of ["p", "reel", "reels", "tv"]) {
+    assert.equal(isValidInstagramUrl(`https://instagram.com/user.name/${type}/ABC_123-/`), true);
+  }
+  for (const input of ["https://instagram.com.evil.test/nasa/reel/abc/", "http://instagram.com/nasa/reel/abc/",
+    "https://user:pass@instagram.com/nasa/reel/abc/", "https://instagram.com:444/nasa/reel/abc/",
+    "https://instagram.com/nasa/reel/abc/extra", "https://instagram.com/accounts/reel/abc/"]) {
+    assert.equal(isValidInstagramUrl(input), false);
+    assert.equal(normalizeInstagramMediaUrl(input), input);
+  }
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    assert.equal(options.body.get("url"), "https://www.instagram.com/reel/DeTUk4sDSp-/?igsh=test");
+    return new Response(encodedMedia());
+  });
+  const result = await extractInstagramMedia(input);
+  assert.equal(result.formats.length, 2);
+  assert.match(result.title, /DeTUk4sDSp-/);
+});
 function encodedMedia() {
   const html = '<div class="download-items"><img src="https://cdninstagram.com/photo.jpg"><div class="download-items__btn"><a href="https://cdninstagram.com/photo.jpg">Download</a></div></div><div class="download-items"><img src="https://cdninstagram.com/video.jpg"><span class="icon-dlvideo"></span><div class="download-items__btn"><a href="https://cdninstagram.com/video.mp4">Download</a></div></div>';
   const decoded = 'getElementById("download-section").innerHTML = "' + html + '"; document.getElementById("inputData").remove(); ';

@@ -17,16 +17,10 @@ const NETWORK_CODES = new Set(["ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "ECONNRESE
   "ENETUNREACH", "EPIPE", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT",
   "UND_ERR_SOCKET", "CERT_HAS_EXPIRED", "DEPTH_ZERO_SELF_SIGNED_CERT", "ERR_TLS_CERT_ALTNAME_INVALID"]);
 
-export function sourceAttempt(provider: SourceProvider) {
-  const started = performance.now();
-  const operationId = crypto.randomUUID();
-  return (stage: SourceStage, reason: SourceReason, error?: unknown, httpStatus?: number, signal?: AbortSignal) => {
-    const facts = error instanceof SourceFetchError ? error : undefined;
-    const cause = facts?.cause ?? error;
+export function diagnosticErrorFacts(cause: unknown, signal?: AbortSignal) {
     const name = cause instanceof Error ? cause.name : "Error";
     const abortName = signal?.aborted && signal.reason instanceof Error ? signal.reason.name : undefined;
     const errorType = ERROR_TYPES.has(abortName ?? name) ? abortName ?? name : "Error";
-    const status = facts?.httpStatus ?? httpStatus;
     let networkCode: string | undefined;
     let current: unknown = cause;
     for (let depth = 0; depth < 3 && current && typeof current === "object"; depth++) {
@@ -34,13 +28,24 @@ export function sourceAttempt(provider: SourceProvider) {
       if (typeof item.code === "string" && NETWORK_CODES.has(item.code)) { networkCode = item.code; break; }
       current = item.cause;
     }
+    return { errorType, ...(networkCode ? { networkCode } : {}) };
+}
+
+export function sourceAttempt(provider: SourceProvider) {
+  const started = performance.now();
+  const operationId = crypto.randomUUID();
+  return (stage: SourceStage, reason: SourceReason, error?: unknown, httpStatus?: number, signal?: AbortSignal) => {
+    const facts = error instanceof SourceFetchError ? error : undefined;
+    const errorFacts = diagnosticErrorFacts(facts?.cause ?? error, signal);
+    const errorType = errorFacts.errorType;
+    const status = facts?.httpStatus ?? httpStatus;
     const event = {
       event: "source_failure", timestamp: new Date().toISOString(), operationId, provider,
       stage: facts?.stage ?? stage,
       reason: errorType === "TimeoutError" ? "timeout" : signal?.aborted || errorType === "AbortError" ? "cancelled" : facts?.reason ?? reason,
       elapsedMs: Math.max(0, Math.round(performance.now() - started)),
       ...(status !== undefined && Number.isInteger(status) && status >= 100 && status <= 599 ? { httpStatus: status } : {}),
-      errorType, ...(networkCode ? { networkCode } : {}),
+      ...errorFacts,
     };
     // Emit one JSON line, including expected source failures that used to be silent.
     // Cancellation is informational; it may simply mean the user cleared a search.

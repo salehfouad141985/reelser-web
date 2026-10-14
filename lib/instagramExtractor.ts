@@ -96,8 +96,22 @@ export interface MediaResult {
 
 export function extractInstagramShortcode(url: string): string | null {
   if (!url) return null;
-  const match = url.match(/(?:instagram\.com\/(?:p|reel|reels|tv|share)\/)([\w-]+)/i);
+  const match = normalizeInstagramMediaUrl(url).match(/(?:instagram\.com\/(?:p|reel|reels|tv|share)\/)([\w-]+)/i);
   return match ? match[1] : null;
+}
+
+// Instagram shares can include the account before the post/reel path.
+// Canonicalize only verified Instagram origins and complete media paths.
+export function normalizeInstagramMediaUrl(input: string): string {
+  const trimmed = input.trim();
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:" || !["instagram.com", "www.instagram.com"].includes(url.hostname) || url.username || url.password || url.port) return trimmed;
+    const match = url.pathname.match(/^\/([a-zA-Z0-9._]{1,30})\/(p|reel|reels|tv)\/([\w-]+)\/?$/);
+    if (!match || ["stories", "share", "explore", "accounts", "direct", "p", "reel", "reels", "tv"].includes(match[1].toLowerCase())) return trimmed;
+    url.pathname = `/${match[2]}/${match[3]}/`;
+    return url.href;
+  } catch { return trimmed; }
 }
 
 export function extractInstagramUsername(input: string): string | null {
@@ -141,7 +155,7 @@ export function extractInstagramUsername(input: string): string | null {
 
 export function isValidInstagramUrl(url: string): boolean {
   if (!url) return false;
-  const trimmed = url.trim();
+  const trimmed = normalizeInstagramMediaUrl(url);
   if (trimmed.includes("://")) {
     try { const parsed = new URL(trimmed); if (parsed.protocol !== "https:" || !["instagram.com", "www.instagram.com"].includes(parsed.hostname) || parsed.username || parsed.password || parsed.port) return false; } catch { return false; }
   }
@@ -588,7 +602,7 @@ async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<Snaps
 }
 
 export async function extractInstagramMedia(inputUrl: string, signal: AbortSignal = AbortSignal.timeout(25000)): Promise<MediaResult | null> {
-  const cleanUrl = inputUrl.trim();
+  const cleanUrl = normalizeInstagramMediaUrl(inputUrl);
   if (!cleanUrl) return null;
   const logFailure = sourceAttempt("snapsave");
 
