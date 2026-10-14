@@ -12,6 +12,54 @@ const client = { exports: {} };
 new Function("module", "exports", compiled)(client, client.exports);
 const { requestExtract } = client.exports;
 
+test("a cancelled search cannot retry or return a late result", async () => {
+  const controller = new AbortController();
+  let resolveRequest;
+  let calls = 0;
+  const pending = requestExtract("@example", "profile", "Try again", async (_url, options) => {
+    calls++;
+    assert.ok(options.signal instanceof AbortSignal);
+    return new Promise(resolve => { resolveRequest = resolve; });
+  }, async () => {}, controller.signal);
+  controller.abort();
+  await assert.rejects(pending, error => error.name === "AbortError");
+  resolveRequest(Response.json({ success: true, data: { title: "stale" } }));
+  assert.equal(calls, 1);
+});
+
+test("cancelling during a retry wait prevents another upstream request", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  await assert.rejects(requestExtract("@example", "profile", "Try again", async () => {
+    calls++;
+    throw new TypeError("connection closed");
+  }, async () => { controller.abort(); }, controller.signal), error => error.name === "AbortError");
+  assert.equal(calls, 1);
+});
+
+test("a pre-cancelled search sends no request", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(requestExtract("@example", "profile", "Try again", async () => {
+    assert.fail("cancelled search contacted server");
+  }, async () => {}, controller.signal), error => error.name === "AbortError");
+});
+
+test("stalled requests are bounded and exhaust retries with a readable error", async t => {
+  const timeout = AbortSignal.timeout.bind(AbortSignal);
+  t.mock.method(AbortSignal, "timeout", ms => timeout(ms === 30000 ? 5 : 1000));
+  let calls = 0;
+  // AbortSignal timeout timers are unref'ed in Node; keep the test alive.
+  const keepAlive = setTimeout(() => {}, 1000);
+  try {
+    await assert.rejects(requestExtract("@example", "profile", "Try again", async () => {
+      calls++;
+      return new Promise(() => {});
+    }, async () => {}), { message: "Try again" });
+    assert.equal(calls, 3);
+  } finally { clearTimeout(keepAlive); }
+});
+
 test("retries an empty response once and returns the next valid result", async () => {
   let calls = 0;
   const delays = [];

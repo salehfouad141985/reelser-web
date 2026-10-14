@@ -5,7 +5,7 @@ import os from "node:os";
 import ffmpegPath from "ffmpeg-static";
 import { acquireLease, RequestError } from "./requestPolicy";
 export async function convertAudio(input: Buffer, signal: AbortSignal): Promise<Buffer> {
-  const release = acquireLease("convert", 2);
+  const release = await acquireLease("convert", 2);
   let directory: string | undefined;
   try {
     signal.throwIfAborted();
@@ -45,6 +45,6 @@ export async function convertAudio(input: Buffer, signal: AbortSignal): Promise<
     });
   } finally {
     try { if (directory) await rm(directory, { recursive: true, force: true }); }
-    finally { release(); }
+    finally { await release(); }
   }
 }

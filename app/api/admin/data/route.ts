@@ -4,12 +4,12 @@ import { verifyAdminToken, getAdminSettings, getAdminStats } from "@/lib/adminSt
 export async function GET(req: NextRequest) {
   try {
   const token = req.cookies.get("reelser_admin_session")?.value;
-  if (!token || !verifyAdminToken(token)) {
+  if (!token || !await verifyAdminToken(token)) {
     return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
   }
 
-  const settings = getAdminSettings();
-  const stats = getAdminStats();
+  const settings = await getAdminSettings();
+  const stats = await getAdminStats();
 
   return NextResponse.json({
     success: true,

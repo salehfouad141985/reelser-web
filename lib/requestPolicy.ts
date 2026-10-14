@@ -8,25 +8,11 @@ export class RequestError extends Error {
 }
 export function clientKey(request: Request) {
   const header = process.env.REELSER_TRUSTED_IP_HEADER;
-  let candidate = header ? request.headers.get(header)?.trim() : null;
-
-  if (!candidate) {
-    // Automatically inspect standard proxy / CDN headers (Hostinger hcdn, Cloudflare, Nginx)
-    candidate = request.headers.get("cf-connecting-ip")?.trim()
-      || request.headers.get("x-real-ip")?.trim()
-      || request.headers.get("x-forwarded-for")?.trim()
-      || null;
-  }
-
-  if (candidate) {
-    // If x-forwarded-for contains multiple comma-separated IPs ("client_ip, proxy_ip"), extract the first one
-    const firstIp = candidate.split(",")[0].trim();
-    if (isIP(firstIp)) return firstIp;
-  }
-
-  return "shared";
+  const candidate = header ? request.headers.get(header)?.trim() : null;
+  // Accept only an explicitly configured single-IP header from a trusted proxy.
+  return candidate && isIP(candidate) ? candidate : "shared";
 }
-export function rateLimit(key: string, limit: number, windowMs = 3600_000) {
+export async function rateLimit(key: string, limit: number, windowMs = 3600_000) {
   return transaction<Record<string, { count: number; expires: number }>, void>("rate-limits", () => ({}), data => {
     const now = Date.now();
     for (const [id, value] of Object.entries(data)) if (value.expires <= now) delete data[id];
@@ -37,8 +23,8 @@ export function rateLimit(key: string, limit: number, windowMs = 3600_000) {
     data[id] = entry;
   });
 }
-export function servicePolicy(request: Request, kind: "extract" | "download" | "proxy") {
-  const settings = getAdminSettings();
+export async function servicePolicy(request: Request, kind: "extract" | "download" | "proxy") {
+  const settings = await getAdminSettings();
   if (settings.maintenance_mode) throw new RequestError("Service temporarily unavailable for maintenance.", 503);
   const client = clientKey(request);
   const baseDownloadLimit = settings.max_downloads_per_ip_hour || 60;
@@ -46,16 +32,22 @@ export function servicePolicy(request: Request, kind: "extract" | "download" | "
   const visitorLimit = kind === "download" ? baseDownloadLimit : kind === "extract" ? Math.max(150, baseDownloadLimit * 2) : 1200;
   // Without a verified visitor IP, keep a high ceiling so one visitor or bot cannot exhaust the site for everybody else
   const limit = client === "shared" ? Math.max(visitorLimit, kind === "proxy" ? 15000 : 3000) : visitorLimit;
-  rateLimit(`${kind}:${client}`, limit);
+  await rateLimit(`${kind}:${client}`, limit);
 }
-export function acquireLease(kind: "extract" | "download" | "convert", limit: number) {
+export const EXTRACTION_CONCURRENCY = 4;
+// Include a margin beyond the operation deadlines for persistence and cleanup.
+const LEASE_DURATION = { extract: 40_000, download: 75_000, convert: 50_000 };
+export async function acquireLease(kind: "extract" | "download" | "convert", limit: number) {
   const id = crypto.randomUUID();
-  transaction<Record<string, number>, void>(`leases-${kind}`, () => ({}), data => {
-    for (const [key, exp] of Object.entries(data)) if (exp < Date.now()) delete data[key];
+  await transaction<Record<string, number>, void>(`leases-${kind}`, () => ({}), data => {
+    for (const [key, exp] of Object.entries(data)) if (exp <= Date.now()) delete data[key];
     if (Object.keys(data).length >= limit) throw new RequestError("Service busy. Try again shortly.", 429);
-    data[id] = Date.now() + 30_000;
+    data[id] = Date.now() + LEASE_DURATION[kind];
   });
-  return () => transaction<Record<string, number>, void>(`leases-${kind}`, () => ({}), data => { delete data[id]; });
+  return async () => {
+    try { await transaction<Record<string, number>, void>(`leases-${kind}`, () => ({}), data => { delete data[id]; }); }
+    catch { console.error("Unable to release resource lease; it will expire automatically", { kind }); }
+  };
 }
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("origin");

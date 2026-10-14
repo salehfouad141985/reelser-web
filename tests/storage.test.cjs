@@ -8,7 +8,7 @@ const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 test("multiple workers update the same file without lost writes", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "reelser-lock-test-"));
-  const script = `require('./tests/register.cjs');const {transaction}=require('./lib/storage.ts');for(let i=0;i<12;i++)transaction('counter',()=>({value:0}),data=>{data.value++});`;
+  const script = `require('./tests/register.cjs');const {transaction}=require('./lib/storage.ts');(async()=>{for(let i=0;i<12;i++)await transaction('counter',()=>({value:0}),data=>{data.value++});})().catch(error=>{console.error(error);process.exitCode=1});`;
   try {
     await Promise.all(Array.from({ length: 3 }, () => promisify(execFile)(process.execPath, ["-e", script], {
       cwd: path.join(__dirname, ".."), env: { ...process.env, REELSER_DATA_DIR: directory }, windowsHide: true, timeout: 15000,

@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-bold text-gray-900 mb-2">3. Logs & Analytics</h2>
           <p>
-            The application stores aggregate request counts and the latest 30 generic activity events without submitted usernames or titles. Rate limits use hashed client identifiers when a trusted proxy is configured; expired counters are removed on subsequent requests. Hosting providers may maintain their own access logs. Google Analytics is not loaded by the application. Configured advertisements may contact third-party providers from isolated frames.
+            The application stores aggregate request counts and up to 200 generic activity events without submitted usernames or titles. Activity retention defaults to 30 days and can be configured by the operator from 1 to 90 days. Rate limits use hashed client identifiers when a trusted proxy is configured; expired counters are removed on subsequent requests. Hosting providers may maintain their own access logs. Google Analytics is not loaded by the application. Configured advertisements may contact third-party providers from isolated frames.
           </p>
         </section>
 

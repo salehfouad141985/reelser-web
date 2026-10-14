@@ -5,11 +5,11 @@ import { fetchMedia, mediaKind } from "@/lib/safeMedia";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
-  let release: (() => void) | undefined;
+  let release: (() => Promise<void>) | undefined;
   try {
-    servicePolicy(req, "proxy");
-    const ticket = readTicket(req.nextUrl.searchParams.get("ticket"), "preview");
-    release = acquireLease("download", 4);
+    await servicePolicy(req, "proxy");
+    const ticket = await readTicket(req.nextUrl.searchParams.get("ticket"), "preview");
+    release = await acquireLease("download", 4);
     const bytes = await fetchMedia(ticket.url, AbortSignal.any([req.signal, AbortSignal.timeout(10_000)]), 8 * 1024 * 1024);
     const kind = mediaKind(bytes);
     if (kind.type !== "image") throw new RequestError("Unsupported image", 415);
@@ -24,5 +24,5 @@ export async function GET(req: NextRequest) {
       : { name: error instanceof Error ? error.name : "unknown", code: (error as NodeJS.ErrnoException)?.code || "unknown" });
     return errorResponse(error);
   }
-  finally { release?.(); }
+  finally { await release?.(); }
 }

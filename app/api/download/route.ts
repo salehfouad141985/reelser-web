@@ -7,11 +7,11 @@ import { convertAudio } from "@/lib/convertAudio";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
-  let release: (() => void) | undefined;
+  let release: (() => Promise<void>) | undefined;
   try {
-    servicePolicy(req, "download");
-    const ticket = readTicket(req.nextUrl.searchParams.get("ticket"), "download");
-    release = acquireLease("download", 4);
+    await servicePolicy(req, "download");
+    const ticket = await readTicket(req.nextUrl.searchParams.get("ticket"), "download");
+    release = await acquireLease("download", 4);
     const signal = AbortSignal.any([req.signal, AbortSignal.timeout(60_000)]);
     let bytes = await fetchMedia(ticket.url, AbortSignal.any([signal, AbortSignal.timeout(20_000)]));
     const kind = mediaKind(bytes);
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     }
     signal.throwIfAborted();
     // Counts fully prepared files, not confirmation that the browser saved them.
-    recordDownloadStat(type);
+    await recordDownloadStat(type);
     return new Response(new Uint8Array(bytes), { headers: {
       "Content-Type": mime, "Content-Length": String(bytes.length),
       "Content-Disposition": `attachment; filename="reelser-media.${ext}"`,
@@ -38,5 +38,5 @@ export async function GET(req: NextRequest) {
       : { name: error instanceof Error ? error.name : "unknown", code: (error as NodeJS.ErrnoException)?.code || "unknown" });
     return errorResponse(error);
   }
-  finally { release?.(); }
+  finally { await release?.(); }
 }

@@ -16,61 +16,61 @@ const tickets = require("../lib/mediaTickets.ts");
 const extractor = require("../lib/instagramExtractor.ts");
 const { NextRequest } = require("next/server");
 
-test("administration fails closed without a strong secret and rejects old defaults", () => {
+test("administration fails closed without a strong secret and rejects old defaults", async () => {
   const previous = process.env.ADMIN_JWT_SECRET;
   delete process.env.ADMIN_JWT_SECRET;
-  assert.throws(() => admin.verifyAdminCredentials("admin", "anything"));
+  await assert.rejects(() => admin.verifyAdminCredentials("admin", "anything"));
   process.env.ADMIN_JWT_SECRET = previous;
-  assert.equal(admin.verifyAdminCredentials("admin", "Admin@Reelser2026!"), false);
-  assert.equal(admin.verifyAdminCredentials("admin", process.env.REELSER_ADMIN_PASS), true);
+  assert.equal(await admin.verifyAdminCredentials("admin", "Admin@Reelser2026!"), false);
+  assert.equal(await admin.verifyAdminCredentials("admin", process.env.REELSER_ADMIN_PASS), true);
 });
-test("sessions expire and revoke on logout, password change and secret rotation", () => {
-  const token = admin.createAdminToken();
-  assert.equal(admin.verifyAdminToken(token), true);
-  admin.revokeAdminToken(token);
-  assert.equal(admin.verifyAdminToken(token), false);
-  const second = admin.createAdminToken();
-  assert.equal(admin.updateAdminPassword("a-new-long-test-password"), true);
-  assert.equal(admin.verifyAdminToken(second), false);
-  const third = admin.createAdminToken();
+test("sessions expire and revoke on logout, password change and secret rotation", async () => {
+  const token = await admin.createAdminToken();
+  assert.equal(await admin.verifyAdminToken(token), true);
+  await admin.revokeAdminToken(token);
+  assert.equal(await admin.verifyAdminToken(token), false);
+  const second = await admin.createAdminToken();
+  assert.equal(await admin.updateAdminPassword("a-new-long-test-password"), true);
+  assert.equal(await admin.verifyAdminToken(second), false);
+  const third = await admin.createAdminToken();
   const key = process.env.ADMIN_JWT_SECRET;
   process.env.ADMIN_JWT_SECRET = "rotated-".repeat(8);
-  assert.equal(admin.verifyAdminToken(third), false);
+  assert.equal(await admin.verifyAdminToken(third), false);
   process.env.ADMIN_JWT_SECRET = key;
   const file = path.join(directory, "admin-config.json");
   const data = JSON.parse(fs.readFileSync(file));
   for (const id in data.sessions) data.sessions[id] = 0;
   fs.writeFileSync(file, JSON.stringify(data));
-  assert.equal(admin.verifyAdminToken(third), false);
-  assert.equal(admin.verifyAdminToken("eyJhbGciOiJIUzI1NiJ9.e30.invalid"), false);
+  assert.equal(await admin.verifyAdminToken(third), false);
+  assert.equal(await admin.verifyAdminToken("eyJhbGciOiJIUzI1NiJ9.e30.invalid"), false);
 });
-test("corrupt storage is not reset and write failures propagate", () => {
+test("corrupt storage is not reset and write failures propagate", async () => {
   const file = path.join(directory, "admin-config.json");
   const original = fs.readFileSync(file);
   fs.writeFileSync(file, "invalid-json");
-  assert.throws(() => admin.getAdminSettings());
+  await assert.rejects(() => admin.getAdminSettings());
   assert.equal(fs.readFileSync(file, "utf8"), "invalid-json");
   fs.writeFileSync(file, original);
-  const failure = mock.method(fs, "renameSync", () => { throw new Error("disk failure"); });
-  assert.throws(() => admin.updateAdminPassword("cannot-be-saved-password"), /disk failure/);
+  const failure = mock.method(fs.promises, "rename", () => { throw new Error("disk failure"); });
+  await assert.rejects(() => admin.updateAdminPassword("cannot-be-saved-password"), /disk failure/);
   failure.mock.restore();
-  assert.equal(admin.verifyAdminCredentials("admin", "a-new-long-test-password"), true);
+  assert.equal(await admin.verifyAdminCredentials("admin", "a-new-long-test-password"), true);
 });
-test("SSRF policy rejects local IPs, lookalike hosts, credentials and unsafe protocols", () => {
+test("SSRF policy rejects local IPs, lookalike hosts, credentials and unsafe protocols", async () => {
   for (const url of ["http://127.0.0.1/", "https://169.254.169.254/", "https://cdninstagram.com.evil.test/", "file:///etc/passwd", "https://user:pass@cdninstagram.com/", "https://cdninstagram.com:444/", "https://[::1]/"]) assert.throws(() => media.validateMediaUrl(url));
   assert.equal(media.validateMediaUrl("https://scontent.cdninstagram.com/image.jpg").hostname, "scontent.cdninstagram.com");
   for (const ip of ["127.0.0.1", "10.0.0.1", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "::ffff:127.0.0.1", "fc00::1", "fe80::1", "2001:db8::1", "2002:c0a8:101::1", "2001:0::1"]) assert.equal(media.publicAddress(ip), false);
   assert.equal(media.publicAddress("8.8.8.8"), true);
   assert.equal(media.publicAddress("2606:4700:4700::1111"), true);
 });
-test("SnapSave CDN media receives tickets only from its exact verified host", () => {
+test("SnapSave CDN media receives tickets only from its exact verified host", async () => {
   const source = "https://d.rapidcdn.app/photo.jpg";
   assert.equal(media.validateMediaUrl(source).hostname, "d.rapidcdn.app");
   for (const url of ["https://rapidcdn.app/photo.jpg", "https://other.rapidcdn.app/photo.jpg", "https://d.rapidcdn.app.evil.test/photo.jpg"]) {
     assert.throws(() => media.validateMediaUrl(url));
   }
   const item = { id: "post-1", type: "image", thumbnail: source, downloadUrl: source };
-  const result = tickets.authorizeMedia({
+  const result = await tickets.authorizeMedia({
     url: "https://instagram.com/example/", title: "Example", author: "Example", platform: "Instagram",
     thumbnail: source, formats: [{ formatId: "1", ext: "jpg", type: "image", quality: "Photo", downloadUrl: source }],
     profileData: { username: "example", fullName: "Example", avatarUrl: "", hdAvatarUrl: "", postsCount: "1", followersCount: "0", followingCount: "0", biography: "", posts: [item], stories: [], reels: [], highlights: [] },
@@ -80,42 +80,42 @@ test("SnapSave CDN media receives tickets only from its exact verified host", ()
   assert.match(result.profileData.posts[0].downloadUrl, /^\/api\/download\?ticket=/);
   assert.match(result.profileData.posts[0].thumbnail, /^\/api\/proxy\?ticket=/);
 });
-test("HTML and SVG are never accepted as media even with an image MIME type", () => {
+test("HTML and SVG are never accepted as media even with an image MIME type", async () => {
   assert.throws(() => media.mediaKind(Buffer.from("<html><script>alert(1)</script>")));
   assert.throws(() => media.mediaKind(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')));
   assert.equal(media.mediaKind(Buffer.from([255,216,255,224])).mime, "image/jpeg");
 });
 test("tickets are scoped and arbitrary source URLs cannot be downloaded", async () => {
   const raw = { url: "https://instagram.com/p/test", title: "test", author: "test", platform: "Instagram", thumbnail: "https://cdninstagram.com/photo.jpg", formats: [{ formatId: "1", ext: "jpg", quality: "original", type: "image", downloadUrl: "https://cdninstagram.com/photo.jpg" }] };
-  const result = tickets.authorizeMedia(raw);
+  const result = await tickets.authorizeMedia(raw);
   const id = new URL(result.formats[0].downloadUrl, "http://localhost").searchParams.get("ticket");
-  assert.equal(tickets.readTicket(id, "download").url, raw.formats[0].downloadUrl);
-  assert.throws(() => tickets.readTicket(id, "preview"));
+  assert.equal((await tickets.readTicket(id, "download")).url, raw.formats[0].downloadUrl);
+  await assert.rejects(() => tickets.readTicket(id, "preview"));
   const { GET } = require("../app/api/download/route.ts");
   const response = await GET(new NextRequest("http://localhost/api/download?url=https://127.0.0.1/private"));
   assert.equal(response.status, 403);
 });
-test("rate limits, concurrency limits and maintenance are enforced", () => {
-  policy.rateLimit("test", 1);
-  assert.throws(() => policy.rateLimit("test", 1), error => error.status === 429);
-  const release = policy.acquireLease("convert", 1);
-  assert.throws(() => policy.acquireLease("convert", 1), error => error.status === 429);
-  release(); policy.acquireLease("convert", 1)();
-  admin.updateAdminSettings({ maintenance_mode: true });
-  assert.throws(() => policy.servicePolicy(new Request("https://reelser.com"), "extract"), error => error.status === 503);
-  admin.updateAdminSettings({ maintenance_mode: false, max_downloads_per_ip_hour: 1 });
+test("rate limits, concurrency limits and maintenance are enforced", async () => {
+  await policy.rateLimit("test", 1);
+  await assert.rejects(() => policy.rateLimit("test", 1), error => error.status === 429);
+  const release = await policy.acquireLease("convert", 1);
+  await assert.rejects(() => policy.acquireLease("convert", 1), error => error.status === 429);
+  await release(); await (await policy.acquireLease("convert", 1))();
+  await admin.updateAdminSettings({ maintenance_mode: true });
+  await assert.rejects(() => policy.servicePolicy(new Request("https://reelser.com"), "extract"), error => error.status === 503);
+  await admin.updateAdminSettings({ maintenance_mode: false, max_downloads_per_ip_hour: 1 });
   const oldHeader = process.env.REELSER_TRUSTED_IP_HEADER;
   process.env.REELSER_TRUSTED_IP_HEADER = "x-test-client-ip";
   try {
     const visitor = new Request("https://reelser.com", { headers: { "x-test-client-ip": "203.0.113.20" } });
-    policy.servicePolicy(visitor, "download");
-    assert.throws(() => policy.servicePolicy(visitor, "download"), error => error.status === 429);
+    await policy.servicePolicy(visitor, "download");
+    await assert.rejects(() => policy.servicePolicy(visitor, "download"), error => error.status === 429);
   } finally {
     if (oldHeader === undefined) delete process.env.REELSER_TRUSTED_IP_HEADER;
     else process.env.REELSER_TRUSTED_IP_HEADER = oldHeader;
   }
-  for (let i = 0; i < 31; i++) policy.servicePolicy(new Request("https://reelser.com"), "extract");
-  admin.updateAdminSettings({ max_downloads_per_ip_hour: 60 });
+  for (let i = 0; i < 31; i++) await policy.servicePolicy(new Request("https://reelser.com"), "extract");
+  await admin.updateAdminSettings({ max_downloads_per_ip_hour: 60 });
 });
 test("failed extraction does not fabricate original media", async () => {
   const fetch = mock.method(globalThis, "fetch", async () => new Response("unavailable", { status: 503 }));
@@ -211,7 +211,7 @@ test("denied media URLs return an actionable client error instead of a gateway e
 });
 
 test("HTML image responses are rejected by the proxy route", async () => {
-  const result = tickets.authorizeMedia({ url: "test", title: "test", author: "test", platform: "Instagram", formats: [], thumbnail: "https://cdninstagram.com/a" });
+  const result = await tickets.authorizeMedia({ url: "test", title: "test", author: "test", platform: "Instagram", formats: [], thumbnail: "https://cdninstagram.com/a" });
   const fetch = mock.method(media, "fetchMedia", async () => Buffer.from("<html>active content</html>"));
   const { GET } = require("../app/api/proxy/route.ts");
   const response = await GET(new NextRequest("http://localhost" + result.thumbnail));
@@ -235,14 +235,14 @@ test("FFmpeg failures return an error and do not count as a download", async () 
     return process;
   });
   const fetch = mock.method(media, "fetchMedia", async () => Buffer.from([0,0,0,24,102,116,121,112,105,115,111,109]));
-  const result = tickets.authorizeMedia({ url: "test", title: "test", author: "test", platform: "Instagram", thumbnail: "", formats: [
+  const result = await tickets.authorizeMedia({ url: "test", title: "test", author: "test", platform: "Instagram", thumbnail: "", formats: [
     { formatId: "audio", ext: "mp3", type: "audio", quality: "MP3", downloadUrl: "https://cdninstagram.com/a.mp4" },
   ] });
-  const before = admin.getAdminStats().totalDownloads;
+  const before = (await admin.getAdminStats()).totalDownloads;
   const { GET } = require("../app/api/download/route.ts");
   const response = await GET(new NextRequest("http://localhost" + result.formats[0].downloadUrl));
   assert.equal(response.status, 502);
-  assert.equal(admin.getAdminStats().totalDownloads, before);
+  assert.equal((await admin.getAdminStats()).totalDownloads, before);
   assert.equal(drained, true);
   spawn.mock.restore(); fetch.mock.restore();
 });
@@ -263,7 +263,7 @@ test("conversion cancellation kills the process and releases its slot", async ()
   const { convertAudio } = require("../lib/convertAudio.ts");
   await assert.rejects(() => convertAudio(Buffer.from("test"), controller.signal), error => error.status === 499);
   assert.equal(killed, true);
-  policy.acquireLease("convert", 1)();
+  await (await policy.acquireLease("convert", 1))();
   spawn.mock.restore();
 });
 
@@ -297,12 +297,12 @@ test("login endpoint locks out repeated attempts with 429", async () => {
 
 test("saved public settings are applied without exposing administration data", async () => {
   const { GET } = require("../app/api/site-settings/route.ts");
-  admin.updateAdminSettings({ maintenance_mode: true, ad_top_banner_enabled: true, ad_top_banner_code: "<p>test</p>" });
-  const body = await GET().json();
+  await admin.updateAdminSettings({ maintenance_mode: true, ad_top_banner_enabled: true, ad_top_banner_code: "<p>test</p>" });
+  const body = await (await GET()).json();
   assert.equal(body.maintenance, true);
   assert.equal(body.banners.top, "<p>test</p>");
   assert.equal(body.password_hash, undefined);
-  admin.updateAdminSettings({ maintenance_mode: false, ad_top_banner_enabled: false });
+  await admin.updateAdminSettings({ maintenance_mode: false, ad_top_banner_enabled: false });
 });
 
 test("mirror media uses its required referer after each redirect", async () => {

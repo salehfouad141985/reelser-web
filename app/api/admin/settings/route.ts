@@ -16,17 +16,17 @@ export async function POST(req: NextRequest) {
   try {
     assertSameOrigin(req);
     const token = req.cookies.get("reelser_admin_session")?.value;
-    if (!token || !verifyAdminToken(token)) throw new RequestError("غير مصرح", 401);
+    if (!token || !await verifyAdminToken(token)) throw new RequestError("غير مصرح", 401);
     const body = await readJson(req);
     if (body.action === "reset_rate_limits") {
       const { transaction } = await import("@/lib/storage");
-      transaction<Record<string, unknown>, void>("rate-limits", () => ({}), data => {
+      await transaction<Record<string, unknown>, void>("rate-limits", () => ({}), data => {
         for (const k of Object.keys(data)) delete data[k];
       });
       return NextResponse.json({ success: true, message: "تم تصفير قيود الطلبات (Rate Limits) بنجاح لجميع المستخدمين." });
     }
     if (body.action === "change_password") {
-      if (typeof body.newPassword !== "string" || !updateAdminPassword(body.newPassword)) throw new RequestError("كلمة المرور يجب أن تكون بين 16 و1024 حرفاً");
+      if (typeof body.newPassword !== "string" || !await updateAdminPassword(body.newPassword)) throw new RequestError("كلمة المرور يجب أن تكون بين 16 و1024 حرفاً");
       const response = NextResponse.json({ success: true, message: "تم تغيير كلمة المرور. سجّل الدخول مجدداً." });
       response.cookies.delete("reelser_admin_session");
       return response;
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 600) throw new RequestError("Download limit must be between 1 and 600");
       update.max_downloads_per_ip_hour = value;
     }
-    const settings = updateAdminSettings(update);
+    const settings = await updateAdminSettings(update);
     return NextResponse.json({ success: true, message: "تم حفظ الإعدادات", settings });
   } catch (error) { return errorResponse(error); }
 }
