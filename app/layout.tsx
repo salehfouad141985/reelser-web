@@ -124,7 +124,7 @@ export default function RootLayout({
           {
             "@type": "Question",
             name: "Is Reelser completely free to use?",
-            acceptedAnswer: { "@type": "Answer", text: "Yes, Reelser is 100% free with unlimited downloads and no subscription needed." },
+            acceptedAnswer: { "@type": "Answer", text: "Reelser is free with usage limits to keep the service available. No subscription is needed." },
           },
           {
             "@type": "Question",

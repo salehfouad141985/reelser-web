@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLanguage } from "./LanguageProvider";
 import { AdBanner, useSiteSettings } from "./SiteSettings";
 import dynamic from "next/dynamic";
@@ -28,6 +28,16 @@ export function HeroSection({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mediaResult, setMediaResult] = useState<MediaResult | null>(null);
+  const searchRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => searchRequest.current?.abort(), []);
+
+  const cancelSearch = () => {
+    searchRequest.current?.abort();
+    searchRequest.current = null;
+    setLoading(false);
+    setError(null);
+    setMediaResult(null);
+  };
 
   const tabs = [
     { id: "reels", label: t("tabReels"), icon: Video },
@@ -41,6 +51,7 @@ export function HeroSection({
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
+        cancelSearch();
         setUrl(text.trim());
         setError(null);
       }
@@ -50,6 +61,7 @@ export function HeroSection({
   };
 
   const handleClear = () => {
+    cancelSearch();
     setUrl("");
     setError(null);
     setMediaResult(null);
@@ -66,19 +78,25 @@ export function HeroSection({
     e.preventDefault();
     if (!url.trim() || maintenance) return;
 
+    searchRequest.current?.abort();
+    const controller = new AbortController();
+    searchRequest.current = controller;
+
     setLoading(true);
     setError(null);
     setMediaResult(null);
 
     try {
-      setMediaResult(await requestExtract(url.trim(), activeTab, t("Download failed. Try again.")));
+      const result = await requestExtract(url.trim(), activeTab, t("Download failed. Try again."), undefined, undefined, controller.signal);
+      if (searchRequest.current === controller && !controller.signal.aborted) setMediaResult(result);
     } catch (err) {
+      if (searchRequest.current !== controller || controller.signal.aborted) return;
       setError(
         (err instanceof Error ? t(err.message) : "") ||
           t("Download failed. Try again.")
       );
     } finally {
-      setLoading(false);
+      if (searchRequest.current === controller) { searchRequest.current = null; setLoading(false); }
     }
   };
 
@@ -115,7 +133,7 @@ export function HeroSection({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { cancelSearch(); setActiveTab(tab.id); }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                   isSelected
                     ? "bg-white text-pink-600 shadow-sm shadow-gray-200"
@@ -138,7 +156,7 @@ export function HeroSection({
             <input aria-label={t("inputPlaceholder")}
               type="text"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => { cancelSearch(); setUrl(e.target.value); }}
               placeholder={getPlaceholder()}
               dir={isRtl ? "rtl" : "ltr"}
               className="w-full px-4 py-3.5 sm:py-3 text-base text-gray-900 placeholder-gray-600 bg-transparent border-0 focus:outline-hidden focus:ring-0"

@@ -6,8 +6,6 @@ import {
   Sparkles,
   Zap,
   CheckCircle2,
-  ShieldCheck,
-  Download,
   Info,
   ArrowRight,
   Sliders,

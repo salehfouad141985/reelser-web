@@ -101,8 +101,8 @@ export function pageResult(username: string, section: ProfileSection, page: Prof
       ext: item.type === "video" ? "mp4" : "jpg", type: item.type, downloadUrl: item.downloadUrl })) };
 }
 
-export function authorizePage(username: string, section: ProfileSection, page: ProfilePage): ProfilePage {
-  const result = authorizeMedia(pageResult(username, section, page));
+export async function authorizePage(username: string, section: ProfileSection, page: ProfilePage): Promise<ProfilePage> {
+  const result = await authorizeMedia(pageResult(username, section, page));
   return { items: result.profileData![section], nextCursor: page.nextCursor };
 }
 

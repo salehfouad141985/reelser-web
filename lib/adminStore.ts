@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
-import { transaction } from "./storage";
+import { promisify } from "node:util";
+import { readSnapshot, transaction } from "./storage";
+const pbkdf2 = promisify(crypto.pbkdf2);
 
 export interface ActivityItem {
   id: string;
@@ -90,36 +92,49 @@ function secret() {
   return value;
 }
 
-function change<R>(fn: (data: AdminData) => R): R {
-  return transaction<AdminData, R>("admin-config", () => ({
+function initialData(): AdminData {
+  return {
     password_hash: "", salt: "", iterations: 210000, sessions: {},
     settings: { ...DEFAULT_SETTINGS }, stats: { ...DEFAULT_STATS, recentActivities: [] },
-  }), data => {
-    if (!data || typeof data.password_hash !== "string" || typeof data.salt !== "string" ||
-        !data.settings || !data.stats || !Array.isArray(data.stats.recentActivities) ||
-        (data.password_hash && (!/^[a-f0-9]{128}$/.test(data.password_hash) || !/^[a-f0-9]{32}$/.test(data.salt))) ||
-        (data.iterations !== undefined && ![10000, 210000].includes(data.iterations)) ||
-        !Number.isInteger(data.settings.max_downloads_per_ip_hour) || data.settings.max_downloads_per_ip_hour < 1 ||
-        data.settings.max_downloads_per_ip_hour > 600 || typeof data.settings.maintenance_mode !== "boolean") {
-      throw new Error("Invalid administration storage; restore a valid backup");
-    }
-    data.settings = { ...DEFAULT_SETTINGS, ...data.settings };
-    data.sessions ??= {}; // Legacy JWTs are intentionally invalid after migration.
-    // نفس minimizeActivityLogs في media-downloader-web — حد 200 واحتفاظ قابل للضبط
-    data.stats.recentActivities = minimizeActivities(data.stats.recentActivities);
-    const result = fn(data);
+  };
+}
+
+function normalizeData(data: AdminData): AdminData {
+  if (!data || typeof data.password_hash !== "string" || typeof data.salt !== "string" ||
+      !data.settings || !data.stats || !Array.isArray(data.stats.recentActivities) ||
+      (data.password_hash && (!/^[a-f0-9]{128}$/.test(data.password_hash) || !/^[a-f0-9]{32}$/.test(data.salt))) ||
+      (data.iterations !== undefined && ![10000, 210000].includes(data.iterations)) ||
+      !Number.isInteger(data.settings.max_downloads_per_ip_hour) || data.settings.max_downloads_per_ip_hour < 1 ||
+      data.settings.max_downloads_per_ip_hour > 600 || typeof data.settings.maintenance_mode !== "boolean") {
+    throw new Error("Invalid administration storage; restore a valid backup");
+  }
+  data.settings = { ...DEFAULT_SETTINGS, ...data.settings };
+  data.sessions ??= {}; // Legacy JWTs are intentionally invalid after migration.
+  // نفس minimizeActivityLogs في media-downloader-web — حد 200 واحتفاظ قابل للضبط
+  data.stats.recentActivities = minimizeActivities(data.stats.recentActivities);
+  return data;
+}
+
+async function snapshot() {
+  return normalizeData(await readSnapshot("admin-config", initialData));
+}
+
+function change<R>(fn: (data: AdminData) => R | Promise<R>): Promise<R> {
+  return transaction<AdminData, R>("admin-config", initialData, async data => {
+    normalizeData(data);
+    const result = await fn(data);
     // تقليم ثانية بعد الكتابة لضمان عدم تجاوز الحد
     data.stats.recentActivities = minimizeActivities(data.stats.recentActivities);
     return result;
   });
 }
 
-function hashPassword(password: string, salt: string, iterations: number) {
-  return crypto.pbkdf2Sync(password, salt, iterations, 64, "sha512").toString("hex");
+async function hashPassword(password: string, salt: string, iterations: number) {
+  return (await pbkdf2(password, salt, iterations, 64, "sha512")).toString("hex");
 }
 
-export function getAdminSettings() { return change(data => ({ ...data.settings })); }
-export function getAdminStats() { return change(data => data.stats); }
+export async function getAdminSettings() { return { ...(await snapshot()).settings }; }
+export async function getAdminStats() { return (await snapshot()).stats; }
 export function updateAdminSettings(partial: Partial<AdminSettings>) {
   return change(data => {
     data.settings = { ...data.settings, ...partial };
@@ -127,16 +142,16 @@ export function updateAdminSettings(partial: Partial<AdminSettings>) {
   });
 }
 
-export function recordExtractionStat(success: boolean) {
-  recordActivity("extract", success);
+export async function recordExtractionStat(success: boolean) {
+  await recordActivity("extract", success);
 }
-export function recordDownloadStat(type: "video" | "audio" | "image") {
-  recordActivity(type, true);
+export async function recordDownloadStat(type: "video" | "audio" | "image") {
+  await recordActivity(type, true);
 }
-function recordActivity(type: ActivityItem["type"], success: boolean) {
+async function recordActivity(type: ActivityItem["type"], success: boolean) {
   // Telemetry must never turn a completed transfer into a failed one.
   try {
-    change(data => {
+    await change(data => {
       const stats = data.stats;
       if (type === "extract") {
         stats.totalExtractions++;
@@ -155,31 +170,44 @@ function recordActivity(type: ActivityItem["type"], success: boolean) {
   } catch { console.error("Unable to persist request statistics"); }
 }
 
-export function verifyAdminCredentials(username: string, password: string) {
+export async function verifyAdminCredentials(username: string, password: string) {
   secret();
   if (username !== "admin" || password === "Admin@Reelser2026!" || password.length > 1024) return false;
-  return change(data => {
-    if (!data.password_hash) {
-      const initial = process.env.REELSER_ADMIN_PASS;
-      if (!initial || initial.length < 16 || initial === "Admin@Reelser2026!") {
-        throw new Error("Administration disabled: configure REELSER_ADMIN_PASS (16+ characters)");
-      }
-      data.salt = crypto.randomBytes(16).toString("hex");
-      data.iterations = 210000;
-      data.password_hash = hashPassword(initial, data.salt, data.iterations);
+  return change(data => credentialsMatch(data, password));
+}
+
+async function credentialsMatch(data: AdminData, password: string) {
+  if (!data.password_hash) {
+    const initial = process.env.REELSER_ADMIN_PASS;
+    if (!initial || initial.length < 16 || initial === "Admin@Reelser2026!") {
+      throw new Error("Administration disabled: configure REELSER_ADMIN_PASS (16+ characters)");
     }
-    const actual = hashPassword(password, data.salt, data.iterations ?? 10000);
-    return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(data.password_hash, "hex"));
+    data.salt = crypto.randomBytes(16).toString("hex");
+    data.iterations = 210000;
+    data.password_hash = await hashPassword(initial, data.salt, data.iterations);
+  }
+  const actual = await hashPassword(password, data.salt, data.iterations ?? 10000);
+  return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(data.password_hash, "hex"));
+}
+
+// Verification and session issuance share a transaction, so a concurrent
+// password change cannot grant a fresh session to the previous password.
+export async function authenticateAdmin(username: string, password: string) {
+  secret();
+  if (username !== "admin" || password === "Admin@Reelser2026!" || password.length > 1024) return null;
+  return change(async data => {
+    if (!await credentialsMatch(data, password)) return null;
+    return issueSession(data);
   });
 }
 
-export function updateAdminPassword(password: string) {
+export async function updateAdminPassword(password: string) {
   secret();
   if (typeof password !== "string" || password.length < 16 || password.length > 1024) return false;
-  return change(data => {
+  return change(async data => {
     data.salt = crypto.randomBytes(16).toString("hex");
     data.iterations = 210000;
-    data.password_hash = hashPassword(password, data.salt, data.iterations);
+    data.password_hash = await hashPassword(password, data.salt, data.iterations);
     data.sessions = {};
     return true;
   });
@@ -188,26 +216,27 @@ export function updateAdminPassword(password: string) {
 function sessionHash(token: string) {
   return crypto.createHmac("sha256", secret()).update(token).digest("hex");
 }
-export function createAdminToken() {
+export async function createAdminToken() {
+  secret();
+  return change(issueSession);
+}
+
+function issueSession(data: AdminData) {
   const token = crypto.randomBytes(32).toString("base64url");
   const hash = sessionHash(token);
-  change(data => {
-    data.sessions = Object.fromEntries(Object.entries(data.sessions!).filter(([, exp]) => exp > Date.now()).slice(-19));
-    data.sessions[hash] = Date.now() + 86400_000;
-  });
+  data.sessions = Object.fromEntries(Object.entries(data.sessions!).filter(([, exp]) => exp > Date.now()).slice(-19));
+  data.sessions[hash] = Date.now() + 86400_000;
   return token;
 }
-export function verifyAdminToken(token: string) {
+export async function verifyAdminToken(token: string) {
   try {
     if (!/^[\w-]{43}$/.test(token)) return false;
     const hash = sessionHash(token);
-    return change(data => {
-      const exp = data.sessions![hash];
-      return Number.isFinite(exp) && exp > Date.now();
-    });
+    const exp = (await snapshot()).sessions![hash];
+    return Number.isFinite(exp) && exp > Date.now();
   } catch { return false; }
 }
-export function revokeAdminToken(token: string) {
+export async function revokeAdminToken(token: string) {
   const hash = sessionHash(token);
-  change(data => { delete data.sessions![hash]; });
+  await change(data => { delete data.sessions![hash]; });
 }

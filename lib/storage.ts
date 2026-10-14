@@ -1,10 +1,10 @@
-import fs from "node:fs";
+import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 
 export function dataDirectory() {
   if (process.env.REELSER_DATA_DIR) {
-    try { fs.mkdirSync(process.env.REELSER_DATA_DIR, { recursive: true }); } catch {}
     return path.resolve(process.env.REELSER_DATA_DIR);
   }
   const cwd = process.cwd();
@@ -13,45 +13,50 @@ export function dataDirectory() {
   if (cwd.includes("hbuilds/versions")) {
     const domainDir = cwd.split("/hbuilds/")[0];
     const persistentData = path.join(domainDir, "data");
-    try {
-      if (!fs.existsSync(persistentData)) fs.mkdirSync(persistentData, { recursive: true });
-      return persistentData;
-    } catch {}
+    return persistentData;
   }
   return path.resolve(path.join(cwd, "data"));
 }
 
 // One local persistent volume shared by all Node workers. A crashed lock fails
 // closed; do not delete it until the owning process has been stopped.
-export function transaction<T, R>(name: string, initial: () => T, change: (data: T) => R): R {
+export async function readSnapshot<T>(name: string, initial: () => T): Promise<T> {
+  try { return JSON.parse(await fs.readFile(path.join(dataDirectory(), name + ".json"), "utf8")) as T; }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return initial();
+    throw new Error("Stored data is unreadable; manual recovery required", { cause: error });
+  }
+}
+
+// Readers see a complete snapshot through atomic replacement. Writers wait
+// asynchronously so a contended lock never blocks Node's event loop.
+export async function transaction<T, R>(name: string, initial: () => T, change: (data: T) => R | Promise<R>): Promise<R> {
   const directory = dataDirectory();
-  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
   const file = path.join(directory, name + ".json");
   const lock = file + ".lock";
-  const deadline = Date.now() + 1500;
+  const deadline = performance.now() + 1500;
   for (;;) {
-    try { fs.mkdirSync(lock); break; }
+    try { await fs.mkdir(lock); break; }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST" || Date.now() >= deadline) throw error;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST" || performance.now() >= deadline) throw error;
+      await delay(10);
     }
   }
   const temporary = `${file}.${crypto.randomUUID()}.tmp`;
   try {
-    let data: T;
-    try { data = JSON.parse(fs.readFileSync(file, "utf8")) as T; }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new Error("Stored data is unreadable; manual recovery required", { cause: error });
-      data = initial();
-    }
-    const result = change(data);
-    const fd = fs.openSync(temporary, "wx", 0o600);
-    try { fs.writeFileSync(fd, JSON.stringify(data)); fs.fsyncSync(fd); }
-    finally { fs.closeSync(fd); }
-    fs.renameSync(temporary, file);
+    const data = await readSnapshot(name, initial);
+    const result = await change(data);
+    const fd = await fs.open(temporary, "wx", 0o600);
+    try { await fd.writeFile(JSON.stringify(data)); await fd.sync(); }
+    finally { await fd.close(); }
+    await fs.rename(temporary, file);
     return result;
   } finally {
-    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
-    fs.rmdirSync(lock);
+    // Cleanup must not replace a committed result or its original error.
+    await fs.unlink(temporary).catch(error => {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.error("Unable to remove storage temporary file");
+    });
+    await fs.rmdir(lock).catch(() => { console.error("Unable to release storage lock; manual recovery required"); });
   }
 }

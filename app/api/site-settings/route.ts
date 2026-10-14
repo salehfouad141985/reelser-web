@@ -1,8 +1,8 @@
 import { getAdminSettings } from "@/lib/adminStore";
 export const dynamic = "force-dynamic";
-export function GET() {
+export async function GET() {
   try {
-    const settings = getAdminSettings();
+    const settings = await getAdminSettings();
     return Response.json({ maintenance: settings.maintenance_mode, banners: {
       top: settings.ad_top_banner_enabled ? settings.ad_top_banner_code : "",
       results: settings.ad_results_banner_enabled ? settings.ad_results_banner_code : "",

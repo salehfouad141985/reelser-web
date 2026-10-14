@@ -7,11 +7,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**.cdninstagram.com" },
-      { protocol: "https", hostname: "**.fbcdn.net" },
-      { protocol: "https", hostname: "instagram.com" },
-    ],
+    // Remote media is served exclusively through validated server-issued tickets.
+    remotePatterns: [],
   },
   async redirects() {
     return [
