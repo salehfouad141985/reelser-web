@@ -2,6 +2,7 @@ import https from "node:https";
 import dns from "node:dns";
 import { BlockList, isIP } from "node:net";
 import { RequestError } from "./requestPolicy";
+import { MediaFetchError } from "./downloadDiagnostics";
 
 const HOSTS = ["cdninstagram.com", "fbcdn.net", "iqsaved.com"];
 const EXACT_HOSTS = new Set(["d.rapidcdn.app"]);
@@ -36,7 +37,11 @@ export function publicAddress(ip: string): boolean {
 }
 
 export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32 * 1024 * 1024): Promise<Buffer> {
-  let url = validateMediaUrl(raw);
+  const validated = (raw: string) => {
+    try { return validateMediaUrl(raw); }
+    catch (error) { throw new MediaFetchError("Unsupported media source", 400, "validation", "source_blocked", undefined, error); }
+  };
+  let url = validated(raw);
   for (let hop = 0; hop < 4; hop++) {
     signal.throwIfAborted();
     const result = await new Promise<{ location?: string; bytes?: Buffer }>((resolve, reject) => {
@@ -66,45 +71,45 @@ export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32
         if ([301, 302, 303, 307, 308].includes(status)) {
           const location = response.headers.location;
           response.destroy();
-          if (!location) reject(new RequestError("Invalid media redirect", 502));
+          if (!location) reject(new MediaFetchError("Invalid media redirect", 502, "redirect", "invalid_redirect", status));
           else resolve({ location });
           return;
         }
         if (status !== 200 || Number(response.headers["content-length"] || 0) > maxBytes) {
-          // Log only the host and status; media URLs can contain signed tokens.
-          console.warn("Media fetch rejected upstream response", {
-            host: url.hostname, status,
-            oversized: Number(response.headers["content-length"] || 0) > maxBytes,
-          });
+          const oversized = Number(response.headers["content-length"] || 0) > maxBytes;
           response.destroy();
           // A rejected or expired source URL is a bad media link, not a gateway
           // failure. A 422 lets the client show the JSON error through Hostinger.
           const denied = status === 403 || status === 404;
-          reject(new RequestError(denied ? "Media link unavailable. Extract it again." : "Media unavailable or too large", denied ? 422 : 502));
+          reject(new MediaFetchError(denied ? "Media link unavailable. Extract it again." : "Media unavailable or too large",
+            denied ? 422 : oversized ? 413 : 502, "http", oversized ? "response_too_large" : "http_status", status));
           return;
         }
         const chunks: Buffer[] = [];
         let size = 0;
         response.on("data", (chunk: Buffer) => {
           size += chunk.length;
-          if (size > maxBytes) response.destroy(new RequestError("Media exceeds size limit", 413));
+          if (size > maxBytes) response.destroy(new MediaFetchError("Media exceeds size limit", 413, "body", "response_too_large", status));
           else chunks.push(chunk);
         });
         response.once("error", error => {
-          console.warn("Media fetch response error", { host: url.hostname, code: (error as NodeJS.ErrnoException).code || "unknown" });
-          reject(error);
+          reject(error instanceof MediaFetchError ? error : new MediaFetchError("Media response failed", 502, "body", "body_read_failed", status, error));
         });
-        response.once("end", () => size ? resolve({ bytes: Buffer.concat(chunks) }) : reject(new RequestError("Empty media", 502)));
+        // Some prematurely closed streams emit close without end or error.
+        response.once("close", () => { if (!response.complete && !response.readableEnded) reject(new MediaFetchError("Media response interrupted", 502, "body", "body_read_failed", status)); });
+        response.once("end", () => size ? resolve({ bytes: Buffer.concat(chunks) }) : reject(new MediaFetchError("Empty media", 502, "body", "empty_body", status)));
       });
       request.once("error", error => {
-        console.warn("Media fetch connection error", { host: url.hostname, code: (error as NodeJS.ErrnoException).code || "unknown" });
-        reject(error);
+        reject(new MediaFetchError("Media connection failed", 502, "transport", "network_failure", undefined, error));
       });
     });
     if (result.bytes) return result.bytes;
-    url = validateMediaUrl(new URL(result.location!, url).href);
+    let redirected: string;
+    try { redirected = new URL(result.location!, url).href; }
+    catch (error) { throw new MediaFetchError("Invalid media redirect", 502, "redirect", "invalid_redirect", undefined, error); }
+    url = validated(redirected);
   }
-  throw new RequestError("Too many media redirects", 502);
+  throw new MediaFetchError("Too many media redirects", 502, "redirect", "too_many_redirects");
 }
 
 export function mediaKind(bytes: Buffer) {

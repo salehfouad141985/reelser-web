@@ -148,7 +148,7 @@ test("network connections reject private DNS answers and revalidate redirects", 
     }));
     return request;
   });
-  await assert.rejects(() => media.fetchMedia("https://cdninstagram.com/a", AbortSignal.timeout(1000)), /Blocked network/);
+  await assert.rejects(() => media.fetchMedia("https://cdninstagram.com/a", AbortSignal.timeout(1000)), error => error.reason === "network_failure" && /Blocked network/.test(error.cause.message));
   assert.equal(connections, 0);
   ip = "8.8.8.8";
   await assert.rejects(() => media.fetchMedia("https://cdninstagram.com/a", AbortSignal.timeout(1000)), /Unsupported media/);
@@ -205,7 +205,7 @@ test("denied media URLs return an actionable client error instead of a gateway e
   try {
     await assert.rejects(
       () => media.fetchMedia("https://cdn.iqsaved.com/avatar.jpg", AbortSignal.timeout(1000)),
-      error => error.status === 422 && /Extract it again/.test(error.message),
+      error => error.status === 422 && error.httpStatus === 403 && error.stage === "http" && error.reason === "http_status" && /Extract it again/.test(error.message),
     );
   } finally { requestMock.mock.restore(); }
 });
