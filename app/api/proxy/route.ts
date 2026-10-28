@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { acquireLease, errorResponse, RequestError, servicePolicy } from "@/lib/requestPolicy";
+import { acquireLease, errorResponse, PROXY_CONCURRENCY, RequestError, servicePolicy } from "@/lib/requestPolicy";
 import { readTicket } from "@/lib/mediaTickets";
 import { fetchMedia, mediaKind } from "@/lib/safeMedia";
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     await servicePolicy(req, "proxy");
     const ticket = await readTicket(req.nextUrl.searchParams.get("ticket"), "preview");
-    release = await acquireLease("download", 4);
+    release = await acquireLease("proxy", PROXY_CONCURRENCY);
     const bytes = await fetchMedia(ticket.url, AbortSignal.any([req.signal, AbortSignal.timeout(10_000)]), 8 * 1024 * 1024);
     const kind = mediaKind(bytes);
     if (kind.type !== "image") throw new RequestError("Unsupported image", 415);

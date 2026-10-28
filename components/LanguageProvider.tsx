@@ -1,8 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, useSyncExternalStore, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { UI_TEXT } from "@/lib/uiText";
 import { Locale, AVAILABLE_LOCALES, TRANSLATIONS, LocaleInfo } from "@/lib/i18n";
+import { detectPathnameLocale } from "@/lib/localeRoutes";
 
 interface LanguageContextType {
   locale: Locale;
@@ -20,20 +22,31 @@ const LanguageContext = createContext<LanguageContextType>({
   isRtl: false,
 });
 
-function readLocale(): Locale {
+function readStoredLocale(): Locale {
+  if (typeof window === "undefined") return "en";
+  const pathLocale = detectPathnameLocale(window.location.pathname);
+  if (pathLocale) return pathLocale;
   let saved: string | null = null;
   try { saved = localStorage.getItem("reelser_locale"); } catch {}
   const candidate = saved || navigator.language.slice(0, 2).toLowerCase();
   return AVAILABLE_LOCALES.some(item => item.code === candidate) ? candidate as Locale : "en";
 }
+
 function subscribeLocale(listener: () => void) {
   window.addEventListener("storage", listener);
   window.addEventListener("reelser-locale", listener);
-  return () => { window.removeEventListener("storage", listener); window.removeEventListener("reelser-locale", listener); };
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener("reelser-locale", listener);
+  };
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const locale = useSyncExternalStore(subscribeLocale, readLocale, () => "en" as Locale);
+  const pathname = usePathname();
+  const storedLocale = useSyncExternalStore(subscribeLocale, readStoredLocale, () => "en" as Locale);
+  const pathLocale = pathname ? detectPathnameLocale(pathname) : null;
+  const locale: Locale = pathLocale || storedLocale;
+
   const setLocale = (next: Locale) => {
     try { localStorage.setItem("reelser_locale", next); } catch {}
     window.dispatchEvent(new Event("reelser-locale"));

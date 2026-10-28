@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { REELSER_PSEO_PAGES } from "@/lib/pseo-data";
+import { buildHreflangMap } from "@/lib/localeRoutes";
 import { HeroSection } from "@/components/HeroSection";
 import { PseoContent } from "@/components/PseoContent";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
+
+const CATEGORY_HUBS: Record<string, { label: string; path: string }> = {
+  reels: { label: "Reels Downloader Hub", path: "/reels" },
+  story: { label: "Story Saver Hub", path: "/story-saver" },
+  photo: { label: "Photo & Carousel Hub", path: "/photo-downloader" },
+  audio: { label: "Audio & MP3 Hub", path: "/audio-downloader" },
+  profile: { label: "Profile & DP Hub", path: "/profile-downloader" },
+};
 
 export async function generateStaticParams() {
   return Object.keys(REELSER_PSEO_PAGES).map((slug) => ({
@@ -28,17 +37,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImage = { url: "/opengraph-image", width: 1200, height: 630, alt: config.metaTitle };
 
   return {
-    title: config.metaTitle,
+    title: {
+      absolute: config.metaTitle,
+    },
     description: config.metaDescription,
     keywords: config.keywords,
     alternates: {
       canonical: url,
+      languages: buildHreflangMap(slug),
     },
     openGraph: {
       title: config.metaTitle,
       description: config.metaDescription,
       url,
       siteName: "Reelser",
+      locale: "en_US",
       type: "website",
       images: [ogImage],
     },
@@ -58,6 +71,8 @@ export default async function PseoPage({ params }: PageProps) {
   if (!config) {
     notFound();
   }
+
+  const hub = CATEGORY_HUBS[config.category] || CATEGORY_HUBS.reels;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -85,6 +100,12 @@ export default async function PseoPage({ params }: PageProps) {
           {
             "@type": "ListItem",
             position: 2,
+            name: hub.label,
+            item: `https://reelser.com${hub.path}`,
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
             name: config.h1,
             item: `https://reelser.com/${slug}`,
           },

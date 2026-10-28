@@ -1,13 +1,12 @@
 import { pageMetadata } from "@/lib/pageMetadata";
 import { HeroSection } from "@/components/HeroSection";
-import { FeaturesSection } from "@/components/FeaturesSection";
+import { CategoryHubSection } from "@/components/CategoryHubSection";
 import { HowToSection } from "@/components/HowToSection";
-import { FaqSection } from "@/components/FaqSection";
 
 export const metadata = pageMetadata(
   "/profile-downloader",
-  "Instagram Profile Picture Downloader",
-  "View and download profile pictures from public Instagram accounts. Enter a username or profile link to save the image available from the source.",
+  "Instagram Profile Viewer & Full HD DP Downloader Hub",
+  "View and download full-size HD profile pictures (DP) and browse public posts, reels, and active stories by @username without logging in.",
 );
 
 export default function ProfileDownloaderPage() {
@@ -15,12 +14,11 @@ export default function ProfileDownloaderPage() {
     <>
       <HeroSection
         initialTab="profile"
-        customTitle="Instagram Profile Picture (DP) Downloader"
-        customDescription="View and save a public Instagram profile picture in the resolution available from the source."
+        customTitle="Instagram Profile Viewer & HD DP Hub"
+        customDescription="View uncropped full-resolution Instagram profile pictures (DP) and explore public posts, reels, and stories by @username."
       />
-      <FeaturesSection />
+      <CategoryHubSection category="profile" />
       <HowToSection />
-      <FaqSection />
     </>
   );
 }

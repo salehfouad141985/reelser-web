@@ -1,13 +1,12 @@
 import { pageMetadata } from "@/lib/pageMetadata";
 import { HeroSection } from "@/components/HeroSection";
-import { FeaturesSection } from "@/components/FeaturesSection";
+import { CategoryHubSection } from "@/components/CategoryHubSection";
 import { HowToSection } from "@/components/HowToSection";
-import { FaqSection } from "@/components/FaqSection";
 
 export const metadata = pageMetadata(
   "/photo-downloader",
-  "Instagram Photo & Carousel Downloader",
-  "Download photos and carousel images from public Instagram posts. Save the available images to your phone or computer with Reelser, without registration.",
+  "Instagram Photo & Carousel Downloader Hub - Full 1080p Resolution",
+  "Download full-resolution photos and multi-slide carousel albums from public Instagram posts. Save original JPG images without compression or screenshots.",
 );
 
 export default function PhotoDownloaderPage() {
@@ -15,12 +14,11 @@ export default function PhotoDownloaderPage() {
     <>
       <HeroSection
         initialTab="photo"
-        customTitle="Instagram Photo & Carousel Downloader"
-        customDescription="Save photos and carousel images from public Instagram posts in the quality available from the source."
+        customTitle="Instagram Photo & Carousel Downloader Hub"
+        customDescription="Extract native 1080p photos and multi-slide carousel albums from public Instagram posts in one click."
       />
-      <FeaturesSection />
+      <CategoryHubSection category="photo" />
       <HowToSection />
-      <FaqSection />
     </>
   );
 }

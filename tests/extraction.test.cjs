@@ -110,3 +110,20 @@ test("denied viewer avatar does not create broken tickets or erase profile metad
     assert.equal(result.formats.length, 2);
   } finally { fetch.mock.restore(); avatarFetch.mock.restore(); }
 });
+
+test("reel extraction falls back to Instagram embed endpoint when primary provider fails", async () => {
+  const embedPayload = `<script>window.__additionalDataLoaded('extra',{"shortcode_media":{"video_url":"https:\\/\\/scontent.cdninstagram.com\\/v\\/t50.2886-16\\/reel_fallback.mp4?efg=1\\u0026oe=2","display_url":"https:\\/\\/scontent.cdninstagram.com\\/v\\/t51.2885-15\\/thumb_fallback.jpg"}});</script>`;
+  const fetch = mock.method(globalThis, "fetch", async (url) => {
+    if (String(url).includes("snapsave.app")) return new Response("unavailable", { status: 503 });
+    if (String(url).includes("/p/DeTUk4sDSp-/embed/captioned/")) return new Response(embedPayload);
+    return new Response("", { status: 404 });
+  });
+  try {
+    const result = await extractInstagramMedia("https://www.instagram.com/reel/DeTUk4sDSp-/");
+    assert.ok(result);
+    assert.equal(result.formats.length, 2);
+    assert.equal(result.formats[0].type, "video");
+    assert.equal(result.formats[0].downloadUrl, "https://scontent.cdninstagram.com/v/t50.2886-16/reel_fallback.mp4?efg=1&oe=2");
+    assert.equal(result.formats[1].type, "audio");
+  } finally { fetch.mock.restore(); }
+});

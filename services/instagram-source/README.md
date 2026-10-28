@@ -24,6 +24,14 @@ Generate a random shared token locally with `python -c "import secrets; print(se
 
 Start the source with `.venv/bin/python source.py` (Windows: `.\.venv\Scripts\python.exe source.py`). Defaults are `127.0.0.1:8010` and `runtime/session.json`. `SOURCE_HOST`, `SOURCE_PORT` and `INSTAGRAM_SESSION_FILE` may override them. Run exactly one source process per session; the request lock, cache and cooldown are process-local.
 
+When login fails, `login.py` writes `login-diagnostic.json` beside the session
+file and prints a short summary. It only records fixed error categories, the
+HTTP status and a fixed endpoint label; raw responses, URLs, account identifiers,
+passwords and session cookies are not included. Check whether the account works
+in the official Instagram app and complete any requested verification there
+before retrying manually. A diagnostic is not proof that an account is blocked
+or that its password is wrong. Never share `session.json`.
+
 ## Docker on the production host
 
 Put `REELSER_SOURCE_TOKEN=<your random secret>` in this directory's ignored `.env` file, then:

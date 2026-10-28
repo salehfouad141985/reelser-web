@@ -39,7 +39,10 @@ export async function transaction<T, R>(name: string, initial: () => T, change: 
   for (;;) {
     try { await fs.mkdir(lock); break; }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST" || performance.now() >= deadline) throw error;
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const stat = await fs.stat(lock).catch(() => null);
+      if (stat && Date.now() - stat.mtimeMs >= 15_000) { await fs.rmdir(lock).catch(() => {}); continue; }
+      if (performance.now() >= deadline) throw error;
       await delay(10);
     }
   }

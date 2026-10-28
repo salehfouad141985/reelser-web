@@ -12,24 +12,71 @@ const MediaCard = dynamic(() => import("./MediaCard").then(module => module.Medi
 
 interface HeroSectionProps {
   initialTab?: "reels" | "story" | "photo" | "audio" | "profile";
+  initialUrl?: string;
   customTitle?: string;
   customDescription?: string;
 }
 
 export function HeroSection({
   initialTab = "reels",
+  initialUrl = "",
   customTitle,
   customDescription,
 }: HeroSectionProps) {
   const { maintenance } = useSiteSettings();
   const { t, isRtl } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl);
+  const autoTriggeredRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mediaResult, setMediaResult] = useState<MediaResult | null>(null);
   const searchRequest = useRef<AbortController | null>(null);
   useEffect(() => () => searchRequest.current?.abort(), []);
+
+  useEffect(() => {
+    if (autoTriggeredRef.current || maintenance) return;
+    let candidate = initialUrl.trim();
+    if (!candidate && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const rawParam = (params.get("url") || params.get("text") || "").trim();
+      const igMatch = rawParam.match(/https?:\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/[^\s"'<>]+/i);
+      candidate = igMatch ? igMatch[0] : rawParam;
+    }
+    if (!candidate) return;
+    autoTriggeredRef.current = true;
+    setUrl(candidate);
+
+    let resolvedTab = initialTab;
+    if (/\/stories\//i.test(candidate)) resolvedTab = "story";
+    else if (/\/p\//i.test(candidate)) resolvedTab = "photo";
+    else if (/\/reels?\//i.test(candidate)) resolvedTab = "reels";
+    setActiveTab(resolvedTab);
+
+    searchRequest.current?.abort();
+    const controller = new AbortController();
+    searchRequest.current = controller;
+    setLoading(true);
+    setError(null);
+    setMediaResult(null);
+
+    requestExtract(candidate, resolvedTab, t("Download failed. Try again."), undefined, undefined, controller.signal)
+      .then((result) => {
+        if (searchRequest.current === controller && !controller.signal.aborted) {
+          setMediaResult(result);
+        }
+      })
+      .catch((err) => {
+        if (searchRequest.current !== controller || controller.signal.aborted) return;
+        setError((err instanceof Error ? t(err.message) : "") || t("Download failed. Try again."));
+      })
+      .finally(() => {
+        if (searchRequest.current === controller) {
+          searchRequest.current = null;
+          setLoading(false);
+        }
+      });
+  }, [initialUrl, initialTab, maintenance, t]);
 
   const cancelSearch = () => {
     searchRequest.current?.abort();

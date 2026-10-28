@@ -1,28 +1,32 @@
+const fs = require("node:fs");
+const path = require("node:path");
 
 const INDEXNOW_KEY = "d2d6601146b940e29a2a0a7337c93bbb";
 const HOST = "reelser.com";
 const KEY_LOCATION = `https://${HOST}/${INDEXNOW_KEY}.txt`;
 
-async function fetchSitemapUrls() {
-  console.log(`Fetching live sitemap from https://${HOST}/sitemap.xml ...`);
+function extractSlugsFromFile(relativePath) {
   try {
-    const res = await fetch(`https://${HOST}/sitemap.xml`, {
-      headers: { "User-Agent": "Reelser-IndexNow/1.0" }
-    });
-    if (res.ok) {
-      const xml = await res.text();
-      const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
-      if (urls.length > 0) {
-        return Array.from(new Set(urls));
-      }
-    }
-  } catch (e) {
-    console.warn("Could not fetch remote sitemap, falling back to base URLs list:", e.message);
+    const content = fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8");
+    return [...content.matchAll(/slug:\s*["']([^"']+)["']|"slug":\s*"([^"]+)"/g)]
+      .map((m) => m[1] || m[2])
+      .filter(Boolean);
+  } catch {
+    return [];
   }
+}
 
-  // Fallback list of primary URLs
-  return [
+function buildLocalSitemapUrls() {
+  const coreUrls = [
     `https://${HOST}`,
+    `https://${HOST}/ar`,
+    `https://${HOST}/es`,
+    `https://${HOST}/pt`,
+    `https://${HOST}/fr`,
+    `https://${HOST}/tr`,
+    `https://${HOST}/id`,
+    `https://${HOST}/de`,
+    `https://${HOST}/ru`,
     `https://${HOST}/reels`,
     `https://${HOST}/story-saver`,
     `https://${HOST}/photo-downloader`,
@@ -30,8 +34,54 @@ async function fetchSitemapUrls() {
     `https://${HOST}/profile-downloader`,
     `https://${HOST}/terms`,
     `https://${HOST}/privacy`,
-    `https://${HOST}/dmca`
+    `https://${HOST}/dmca`,
   ];
+
+  const enSlugs = extractSlugsFromFile("lib/pseo-data.ts").map((s) => `https://${HOST}/${s}`);
+  const arSlugs = extractSlugsFromFile("lib/pseo-ar-data.ts").map((s) => `https://${HOST}/ar/${s}`);
+  const esSlugs = extractSlugsFromFile("lib/pseo-es-data.ts").map((s) => `https://${HOST}/es/${s}`);
+  const ptSlugs = extractSlugsFromFile("lib/pseo-pt-data.ts").map((s) => `https://${HOST}/pt/${s}`);
+  const frSlugs = extractSlugsFromFile("lib/pseo-fr-data.ts").map((s) => `https://${HOST}/fr/${s}`);
+  const trSlugs = extractSlugsFromFile("lib/pseo-tr-data.ts").map((s) => `https://${HOST}/tr/${s}`);
+  const idSlugs = extractSlugsFromFile("lib/pseo-id-data.ts").map((s) => `https://${HOST}/id/${s}`);
+  const deSlugs = extractSlugsFromFile("lib/pseo-de-data.ts").map((s) => `https://${HOST}/de/${s}`);
+  const ruSlugs = extractSlugsFromFile("lib/pseo-ru-data.ts").map((s) => `https://${HOST}/ru/${s}`);
+
+  return Array.from(
+    new Set([
+      ...coreUrls,
+      ...enSlugs,
+      ...arSlugs,
+      ...esSlugs,
+      ...ptSlugs,
+      ...frSlugs,
+      ...trSlugs,
+      ...idSlugs,
+      ...deSlugs,
+      ...ruSlugs,
+    ])
+  );
+}
+
+async function fetchSitemapUrls() {
+  const localUrls = buildLocalSitemapUrls();
+  console.log(`Built ${localUrls.length} local sitemap URLs. Checking remote https://${HOST}/sitemap.xml ...`);
+  try {
+    const res = await fetch(`https://${HOST}/sitemap.xml`, {
+      headers: { "User-Agent": "Reelser-IndexNow/1.0" },
+    });
+    if (res.ok) {
+      const xml = await res.text();
+      const remoteUrls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+      if (remoteUrls.length > 0) {
+        return Array.from(new Set([...localUrls, ...remoteUrls]));
+      }
+    }
+  } catch (e) {
+    console.warn("Could not fetch remote sitemap, using complete local URLs list:", e.message);
+  }
+
+  return localUrls;
 }
 
 async function submitToIndexNow() {
@@ -47,7 +97,7 @@ async function submitToIndexNow() {
 
   const endpoints = [
     "https://api.indexnow.org/indexnow",
-    "https://www.bing.com/indexnow"
+    "https://www.bing.com/indexnow",
   ];
 
   for (const endpoint of endpoints) {

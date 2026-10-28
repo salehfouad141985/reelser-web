@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken, getAdminSettings, getAdminStats } from "@/lib/adminStore";
+import sitemap from "@/app/sitemap";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
       nodeVersion: process.version,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
+      indexedPages: sitemap().length,
     },
   }, { headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ success: false, error: "Storage unavailable" }, { status: 503 }); }

@@ -137,3 +137,23 @@ test("password resets revoke sessions issued by authenticated login", async () =
   assert.equal(await admin.authenticateAdmin("admin", process.env.REELSER_ADMIN_PASS), null);
   assert.ok(await admin.authenticateAdmin("admin", "new-regression-only-password"));
 });
+
+test("proxy thumbnail previews do not exhaust video download concurrency slots and extract rejects cross-origin POST", async () => {
+  const releases = [];
+  try {
+    for (let i = 0; i < policy.DOWNLOAD_CONCURRENCY; i++) {
+      releases.push(await policy.acquireLease("download", policy.DOWNLOAD_CONCURRENCY));
+    }
+    const releaseProxy = await policy.acquireLease("proxy", policy.PROXY_CONCURRENCY);
+    await releaseProxy();
+  } finally {
+    for (const release of releases) await release();
+  }
+  const { POST } = require("../app/api/extract/route.ts");
+  const crossOrigin = new NextRequest("https://reelser.com/api/extract", {
+    method: "POST",
+    headers: { origin: "https://evil.example.com" },
+    body: JSON.stringify({ url: "@example" }),
+  });
+  assert.equal((await POST(crossOrigin)).status, 403);
+});

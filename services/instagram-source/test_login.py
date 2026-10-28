@@ -9,6 +9,25 @@ import login
 
 
 class LoginTests(unittest.TestCase):
+    def test_login_failure_writes_diagnostic_without_saving_session_or_retrying(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "session.json"
+            with patch.object(login, "session_path", return_value=path), \
+                 patch.object(login, "Client") as client, \
+                 patch("builtins.input", return_value="example"), \
+                 patch.object(login.getpass, "getpass", side_effect=["test-password", ""]), \
+                 redirect_stdout(io.StringIO()) as output:
+                client.return_value.login.side_effect = RuntimeError("test-password")
+                client.return_value.last_json = {"message": "Sorry, there was a problem with your request."}
+                client.return_value.last_response = None
+                with self.assertRaises(SystemExit):
+                    login.main()
+                client.return_value.login.assert_called_once()
+                client.return_value.dump_settings.assert_not_called()
+                self.assertTrue((path.parent / "login-diagnostic.json").exists())
+                self.assertNotIn("test-password", output.getvalue())
+                self.assertIn("request_rejected", output.getvalue())
+
     def test_permission_failure_before_credentials_or_instagram(self):
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(login, "session_path", return_value=Path(directory) / "session.json"), \

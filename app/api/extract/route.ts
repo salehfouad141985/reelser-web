@@ -2,12 +2,13 @@ import { NextRequest } from "next/server";
 import { extractInstagramMedia, extractInstagramUsername, isValidInstagramUrl } from "@/lib/instagramExtractor";
 import { recordExtractionStat } from "@/lib/adminStore";
 import { authorizeMedia } from "@/lib/mediaTickets";
-import { EXTRACTION_CONCURRENCY, acquireLease, errorResponse, readJson, RequestError, servicePolicy } from "@/lib/requestPolicy";
+import { EXTRACTION_CONCURRENCY, acquireLease, assertSameOrigin, errorResponse, readJson, RequestError, servicePolicy } from "@/lib/requestPolicy";
 import { extractSelfHostedProfile, sourceEnabled } from "@/lib/selfHostedSource";
 export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   let release: (() => Promise<void>) | undefined;
   try {
+    assertSameOrigin(req);
     await servicePolicy(req, "extract");
     const body = await readJson(req, 4096);
     if (typeof body.url !== "string" || body.url.length > 2048 || !isValidInstagramUrl(body.url)) {

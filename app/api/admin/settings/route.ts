@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const body = await readJson(req);
     if (body.action === "reset_rate_limits") {
       const { transaction } = await import("@/lib/storage");
-      await transaction<Record<string, unknown>, void>("rate-limits", () => ({}), data => {
+      for (const store of ["rate-limits", "leases-extract", "leases-download", "leases-convert", "leases-proxy"]) await transaction<Record<string, unknown>, void>(store, () => ({}), data => {
         for (const k of Object.keys(data)) delete data[k];
       });
       return NextResponse.json({ success: true, message: "تم تصفير قيود الطلبات (Rate Limits) بنجاح لجميع المستخدمين." });

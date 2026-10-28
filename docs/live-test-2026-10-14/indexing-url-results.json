@@ -1,0 +1,153 @@
+[
+  {
+    "input": "http://reelser.com/",
+    "checkedAt": "2026-10-14T18:53:10.790Z",
+    "chain": [
+      {
+        "url": "http://reelser.com/",
+        "status": 301,
+        "location": "https://reelser.com/"
+      },
+      {
+        "url": "https://reelser.com/",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/",
+    "canonical": "https://reelser.com",
+    "h1": "Free Instagram Downloader",
+    "metaRobots": "index, follow",
+    "headerRobots": null
+  },
+  {
+    "input": "http://www.reelser.com/",
+    "checkedAt": "2026-10-14T18:53:12.063Z",
+    "chain": [
+      {
+        "url": "http://www.reelser.com/",
+        "status": 301,
+        "location": "https://www.reelser.com/"
+      },
+      {
+        "url": "https://www.reelser.com/",
+        "status": 308,
+        "location": "https://reelser.com"
+      },
+      {
+        "url": "https://reelser.com/",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/",
+    "canonical": "https://reelser.com",
+    "h1": "Free Instagram Downloader",
+    "metaRobots": "index, follow",
+    "headerRobots": null
+  },
+  {
+    "input": "https://www.reelser.com/",
+    "checkedAt": "2026-10-14T18:53:13.993Z",
+    "chain": [
+      {
+        "url": "https://www.reelser.com/",
+        "status": 308,
+        "location": "https://reelser.com"
+      },
+      {
+        "url": "https://reelser.com/",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/",
+    "canonical": "https://reelser.com",
+    "h1": "Free Instagram Downloader",
+    "metaRobots": "index, follow",
+    "headerRobots": null
+  },
+  {
+    "input": "https://reelser.com/",
+    "checkedAt": "2026-10-14T18:53:14.414Z",
+    "chain": [
+      {
+        "url": "https://reelser.com/",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/",
+    "canonical": "https://reelser.com",
+    "h1": "Free Instagram Downloader",
+    "metaRobots": "index, follow",
+    "headerRobots": null
+  },
+  {
+    "input": "https://reelser.com/audio-downloader",
+    "checkedAt": "2026-10-14T18:53:14.571Z",
+    "chain": [
+      {
+        "url": "https://reelser.com/audio-downloader",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/audio-downloader",
+    "canonical": "https://reelser.com/audio-downloader",
+    "h1": "Instagram Audio &amp; MP3 Downloader",
+    "metaRobots": "index, follow",
+    "headerRobots": null
+  },
+  {
+    "input": "https://reelser.com/anonymous-instagram-story-viewer",
+    "checkedAt": "2026-10-14T18:53:14.731Z",
+    "chain": [
+      {
+        "url": "https://reelser.com/anonymous-instagram-story-viewer",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/anonymous-instagram-story-viewer",
+    "canonical": "https://reelser.com/anonymous-instagram-story-viewer",
+    "h1": "Anonymous Instagram Story Viewer",
+    "metaRobots": "index, follow",
+    "headerRobots": null
+  },
+  {
+    "input": "https://reelser.com/download-instagram-reels",
+    "checkedAt": "2026-10-14T18:53:15.000Z",
+    "chain": [
+      {
+        "url": "https://reelser.com/download-instagram-reels",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/download-instagram-reels",
+    "canonical": "https://reelser.com/download-instagram-reels",
+    "h1": "Download Instagram Reels Online",
+    "metaRobots": "index, follow",
+    "headerRobots": null
+  },
+  {
+    "input": "https://reelser.com/robots.txt",
+    "checkedAt": "2026-10-14T18:53:15.284Z",
+    "chain": [
+      {
+        "url": "https://reelser.com/robots.txt",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/robots.txt",
+    "headerRobots": null,
+    "robots": "User-Agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\n\nSitemap: https://reelser.com/sitemap.xml\n"
+  },
+  {
+    "input": "https://reelser.com/sitemap.xml",
+    "checkedAt": "2026-10-14T18:53:15.518Z",
+    "chain": [
+      {
+        "url": "https://reelser.com/sitemap.xml",
+        "status": 200
+      }
+    ],
+    "final": "https://reelser.com/sitemap.xml",
+    "headerRobots": null,
+    "sitemapCount": 44
+  }
+]

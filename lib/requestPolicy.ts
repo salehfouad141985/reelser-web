@@ -18,7 +18,7 @@ export async function rateLimit(key: string, limit: number, windowMs = 3600_000)
     for (const [id, value] of Object.entries(data)) if (value.expires <= now) delete data[id];
     const id = crypto.createHash("sha256").update(key).digest("hex");
     const entry = data[id] ?? { count: 0, expires: now + windowMs };
-    if (entry.count >= limit || Object.keys(data).length > 10000) throw new RequestError("Too many requests. Try again later.", 429);
+    if (entry.count >= limit || (!data[id] && Object.keys(data).length >= 10000)) throw new RequestError("Too many requests. Try again later.", 429);
     entry.count++;
     data[id] = entry;
   });
@@ -35,9 +35,11 @@ export async function servicePolicy(request: Request, kind: "extract" | "downloa
   await rateLimit(`${kind}:${client}`, limit);
 }
 export const EXTRACTION_CONCURRENCY = 4;
+export const DOWNLOAD_CONCURRENCY = 6;
+export const PROXY_CONCURRENCY = 24;
 // Include a margin beyond the operation deadlines for persistence and cleanup.
-const LEASE_DURATION = { extract: 40_000, download: 75_000, convert: 50_000 };
-export async function acquireLease(kind: "extract" | "download" | "convert", limit: number) {
+const LEASE_DURATION = { extract: 40_000, download: 75_000, convert: 50_000, proxy: 20_000 };
+export async function acquireLease(kind: "extract" | "download" | "convert" | "proxy", limit: number) {
   const id = crypto.randomUUID();
   await transaction<Record<string, number>, void>(`leases-${kind}`, () => ({}), data => {
     for (const [key, exp] of Object.entries(data)) if (exp <= Date.now()) delete data[key];

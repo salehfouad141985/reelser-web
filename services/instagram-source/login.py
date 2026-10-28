@@ -4,6 +4,7 @@ import os
 import tempfile
 from instagrapi import Client
 from source import session_path
+from login_diagnostics import save_failure_report
 
 
 def main():
@@ -29,6 +30,10 @@ def main():
             raise RuntimeError("Login failed")
     except Exception as exc:
         print(f"Login failed ({type(exc).__name__}). Check Instagram and try again manually.")
+        try:
+            save_failure_report(client, exc, path)
+        except Exception:
+            print("Could not write the login diagnostic.")
         raise SystemExit(1) from None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

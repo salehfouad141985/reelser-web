@@ -36,7 +36,7 @@ export function publicAddress(ip: string): boolean {
     (a === 203 && b === 0 && c === 113));
 }
 
-export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 32 * 1024 * 1024): Promise<Buffer> {
+export async function fetchMedia(raw: string, signal: AbortSignal, maxBytes = 64 * 1024 * 1024): Promise<Buffer> {
   const validated = (raw: string) => {
     try { return validateMediaUrl(raw); }
     catch (error) { throw new MediaFetchError("Unsupported media source", 400, "validation", "source_blocked", undefined, error); }

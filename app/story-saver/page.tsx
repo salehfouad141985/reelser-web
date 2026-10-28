@@ -1,13 +1,12 @@
 import { pageMetadata } from "@/lib/pageMetadata";
 import { HeroSection } from "@/components/HeroSection";
-import { FeaturesSection } from "@/components/FeaturesSection";
+import { CategoryHubSection } from "@/components/CategoryHubSection";
 import { HowToSection } from "@/components/HowToSection";
-import { FaqSection } from "@/components/FaqSection";
 
 export const metadata = pageMetadata(
   "/story-saver",
-  "Instagram Story Saver",
-  "View and download available stories from public Instagram accounts. Save story photos and videos to your phone or computer with Reelser.",
+  "Instagram Story Saver Hub - View & Download Public Stories Anonymously",
+  "View and download active 24-hour Instagram Stories and pinned Highlights from public accounts with 100% anonymity and no login required.",
 );
 
 export default function StorySaverPage() {
@@ -15,12 +14,11 @@ export default function StorySaverPage() {
     <>
       <HeroSection
         initialTab="story"
-        customTitle="Instagram Story Saver"
-        customDescription="View and save available photos and videos from public Instagram stories before they expire."
+        customTitle="Anonymous Instagram Story Saver Hub"
+        customDescription="View and save available photos, videos, and highlights from public Instagram stories without appearing in the viewer list."
       />
-      <FeaturesSection />
+      <CategoryHubSection category="story" />
       <HowToSection />
-      <FaqSection />
     </>
   );
 }

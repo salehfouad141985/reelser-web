@@ -60,6 +60,7 @@ interface AdminData {
     nodeVersion: string;
     uptime: number;
     timestamp: string;
+    indexedPages?: number;
   };
 }
 
@@ -92,6 +93,26 @@ export default function ReelserAdminPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [pwMessage, setPwMessage] = useState<string | null>(null);
   const [pwError, setPwError] = useState<string | null>(null);
+  const [isSubmittingIndexNow, setIsSubmittingIndexNow] = useState(false);
+  const [indexNowStatus, setIndexNowStatus] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleIndexNowSubmit = async () => {
+    setIsSubmittingIndexNow(true);
+    setIndexNowStatus(null);
+    try {
+      const res = await fetch("/api/admin/indexnow", { method: "POST" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setIndexNowStatus({ ok: true, text: json.message || `تم إرسال ${json.totalUrls} صفحة بنجاح` });
+      } else {
+        setIndexNowStatus({ ok: false, text: json.message || json.error || "فشل الإرسال" });
+      }
+    } catch {
+      setIndexNowStatus({ ok: false, text: "تعذر الاتصال بالخادم" });
+    } finally {
+      setIsSubmittingIndexNow(false);
+    }
+  };
 
   const loadData = useCallback(() => {
     return fetch("/api/admin/data", { cache: "no-store" })
@@ -170,6 +191,27 @@ export default function ReelserAdminPage() {
         setTimeout(() => setSaveMessage(null), 4000);
       } else {
         setSaveError(result.error || "حدث خطأ أثناء الحفظ");
+      }
+    } catch {
+      setSaveError("تعذر الاتصال بالسيرفر");
+    }
+  };
+
+  const handleResetRateLimits = async () => {
+    setSaveMessage(null);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset_rate_limits" }),
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setSaveMessage(result.message || "تم تصفير قيود الطلبات بنجاح!");
+        setTimeout(() => setSaveMessage(null), 4000);
+      } else {
+        setSaveError(result.error || "فشل تصفير قيود الطلبات");
       }
     } catch {
       setSaveError("تعذر الاتصال بالسيرفر");
@@ -463,8 +505,28 @@ export default function ReelserAdminPage() {
                   <span>الصفحات المفهرسة</span>
                   <Radio className="w-4 h-4 text-blue-400" />
                 </div>
-                <p className="text-3xl font-black text-blue-400 mt-2">45 صفحة</p>
-                <span className="text-[11px] text-blue-300 font-medium">Google + Bing sitemap</span>
+                <p className="text-3xl font-black text-blue-400 mt-2">{data?.system?.indexedPages ?? 172} صفحة</p>
+                <span className="text-[11px] text-blue-300 font-medium block">Google + Bing + Yandex Sitemap</span>
+                <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={handleIndexNowSubmit}
+                    disabled={isSubmittingIndexNow}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSubmittingIndexNow ? "animate-spin" : ""}`} />
+                    <span>{isSubmittingIndexNow ? "جاري الإرسال..." : "إرسال فوري لـ IndexNow"}</span>
+                  </button>
+                  {indexNowStatus && (
+                    <p
+                      className={`text-[10px] font-semibold leading-snug ${
+                        indexNowStatus.ok ? "text-emerald-400" : "text-rose-400"
+                      }`}
+                    >
+                      {indexNowStatus.text}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -734,6 +796,14 @@ export default function ReelserAdminPage() {
               >
                 <Save className="w-4 h-4" />
                 <span>حفظ التعديلات</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleResetRateLimits}
+                className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>تصفير قيود الطلبات والحصص المؤقتة (Reset Rate Limits)</span>
               </button>
             </div>
           </div>

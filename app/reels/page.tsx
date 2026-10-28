@@ -1,13 +1,12 @@
 import { pageMetadata } from "@/lib/pageMetadata";
 import { HeroSection } from "@/components/HeroSection";
-import { FeaturesSection } from "@/components/FeaturesSection";
+import { CategoryHubSection } from "@/components/CategoryHubSection";
 import { HowToSection } from "@/components/HowToSection";
-import { FaqSection } from "@/components/FaqSection";
 
 export const metadata = pageMetadata(
   "/reels",
-  "Instagram Reels Downloader",
-  "Download public Instagram Reels as MP4 videos with audio. Save available videos to your phone or computer with Reelser, free and without registration.",
+  "Instagram Reels Hub - Download 1080p MP4 Reels Online",
+  "Save public Instagram Reels as Full HD MP4 videos with original stereo audio. Explore all Reels downloaders, converters, and device guides on Reelser.",
 );
 
 export default function ReelsPage() {
@@ -15,12 +14,11 @@ export default function ReelsPage() {
     <>
       <HeroSection
         initialTab="reels"
-        customTitle="Instagram Reels Downloader"
-        customDescription="Save public Instagram Reels as MP4 videos with audio in the quality available from the source."
+        customTitle="Instagram Reels Downloader Hub"
+        customDescription="Save public Instagram Reels as Full HD MP4 videos with original stereo audio on iPhone, Android, or PC."
       />
-      <FeaturesSection />
+      <CategoryHubSection category="reels" />
       <HowToSection />
-      <FaqSection />
     </>
   );
 }

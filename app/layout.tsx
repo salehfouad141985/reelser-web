@@ -19,11 +19,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://reelser.com"),
   title: {
-    default: "Reelser - Instagram Reels & Video Downloader",
+    default: "Reelser - Instagram Reels, Story, Photo & Audio Downloader",
     template: "%s | Reelser",
   },
   description:
-    "Download public Instagram Reels, videos, stories, photos, and audio with Reelser. Free online tools for your phone or computer, with no registration.",
+    "Download public Instagram Reels, videos, stories, photos, and MP3 audio with Reelser. Fast, free online tools for iPhone, Android, and PC with no registration.",
   keywords: [
     "instagram reels download",
     "instagram video downloader",
@@ -47,20 +47,20 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://reelser.com",
     languages: {
-      "en": "https://reelser.com",
-      "ar": "https://reelser.com",
-      "es": "https://reelser.com",
-      "fr": "https://reelser.com",
-      "pt": "https://reelser.com",
-      "de": "https://reelser.com",
-      "tr": "https://reelser.com",
-      "id": "https://reelser.com",
-      "ru": "https://reelser.com",
+      en: "https://reelser.com",
+      ar: "https://reelser.com/ar",
+      es: "https://reelser.com/es",
+      pt: "https://reelser.com/pt",
+      fr: "https://reelser.com/fr",
+      tr: "https://reelser.com/tr",
+      id: "https://reelser.com/id",
+      de: "https://reelser.com/de",
+      ru: "https://reelser.com/ru",
       "x-default": "https://reelser.com",
     },
   },
   openGraph: {
-    title: "Reelser - Instagram Reels & Video Downloader (source quality)",
+    title: "Reelser - Instagram Reels & Video Downloader (Source Quality)",
     description:
       "Save Instagram Reels, Videos, Stories, Photos, and Audio directly to your device for free in the quality available from the source.",
     url: "https://reelser.com",
@@ -97,40 +97,39 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "Organization",
+        "@id": "https://reelser.com/#organization",
+        name: "Reelser",
+        url: "https://reelser.com",
+        logo: "https://reelser.com/icon.svg",
+      },
+      {
         "@type": "WebSite",
         "@id": "https://reelser.com/#website",
         url: "https://reelser.com",
         name: "Reelser",
-        description: "Free online tools to download public Instagram media.",
-        inLanguage: ["en", "ar", "es", "fr", "pt", "de", "tr", "id", "ru"],
+        publisher: { "@id": "https://reelser.com/#organization" },
+        inLanguage: ["en", "ar", "es", "pt", "fr", "de", "tr", "id", "ru"],
+        description: "Free online tools to download public Instagram Reels, Stories, Photos, Profile Pictures, and MP3 Audio.",
       },
       {
-        "@type": "WebApplication",
-        "@id": "https://reelser.com/#application",
-        name: "Reelser - Instagram Downloader",
-        url: "https://reelser.com",
-        applicationCategory: "MultimediaApplication",
-        operatingSystem: "All (iOS, Android, Windows, macOS, Linux)",
-        offers: {
-          "@type": "Offer",
-          price: "0",
-          priceCurrency: "USD",
-        },
-      },
-      {
-        "@type": "FAQPage",
-        "@id": "https://reelser.com/#faq",
-        mainEntity: [
-          {
-            "@type": "Question",
-            name: "Is Reelser completely free to use?",
-            acceptedAnswer: { "@type": "Answer", text: "Reelser is free with usage limits to keep the service available. No subscription is needed." },
-          },
-          {
-            "@type": "Question",
-            name: "Does Reelser work on iPhone and Android?",
-            acceptedAnswer: { "@type": "Answer", text: "Yes, Reelser works seamlessly in any browser on iPhone (Safari), Android (Chrome), Mac, and PC." },
-          },
+        "@type": "ItemList",
+        "@id": "https://reelser.com/#navigation",
+        name: "Reelser Main Navigation & Language Hubs",
+        itemListElement: [
+          { "@type": "SiteNavigationElement", position: 1, name: "Instagram Reels Downloader", url: "https://reelser.com/reels" },
+          { "@type": "SiteNavigationElement", position: 2, name: "Instagram Story Saver", url: "https://reelser.com/story-saver" },
+          { "@type": "SiteNavigationElement", position: 3, name: "Instagram Photo & Carousel Downloader", url: "https://reelser.com/photo-downloader" },
+          { "@type": "SiteNavigationElement", position: 4, name: "Instagram Audio & MP3 Extractor", url: "https://reelser.com/audio-downloader" },
+          { "@type": "SiteNavigationElement", position: 5, name: "Instagram Profile & DP Viewer", url: "https://reelser.com/profile-downloader" },
+          { "@type": "SiteNavigationElement", position: 6, name: "تحميل من الانستقرام (Arabic)", url: "https://reelser.com/ar" },
+          { "@type": "SiteNavigationElement", position: 7, name: "Descargar de Instagram (Español)", url: "https://reelser.com/es" },
+          { "@type": "SiteNavigationElement", position: 8, name: "Baixar do Instagram (Português)", url: "https://reelser.com/pt" },
+          { "@type": "SiteNavigationElement", position: 9, name: "Télécharger Instagram (Français)", url: "https://reelser.com/fr" },
+          { "@type": "SiteNavigationElement", position: 10, name: "Instagram Herunterladen (Deutsch)", url: "https://reelser.com/de" },
+          { "@type": "SiteNavigationElement", position: 11, name: "Instagram İndirici (Türkçe)", url: "https://reelser.com/tr" },
+          { "@type": "SiteNavigationElement", position: 12, name: "Download Instagram (Indonesia)", url: "https://reelser.com/id" },
+          { "@type": "SiteNavigationElement", position: 13, name: "Скачать с Инстаграма (Русский)", url: "https://reelser.com/ru" },
         ],
       },
     ],
@@ -147,9 +146,9 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col bg-white text-gray-900 font-sans antialiased selection:bg-pink-500 selection:text-white">
         <LanguageProvider>
           <SiteSettings>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
           </SiteSettings>
         </LanguageProvider>
       </body>

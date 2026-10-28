@@ -2,9 +2,10 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useLanguage } from "./LanguageProvider";
-import { AVAILABLE_LOCALES } from "@/lib/i18n";
+import { AVAILABLE_LOCALES, Locale } from "@/lib/i18n";
+import { detectPathnameLocale, resolveLocalizedPath } from "@/lib/localeRoutes";
 import {
   Video,
   Image as ImageIcon,
@@ -21,36 +22,101 @@ import {
 export function Navbar() {
   const { locale, setLocale, t, currentLocaleInfo, isRtl } = useLanguage();
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
 
+  const activeHubLocale = pathname ? detectPathnameLocale(pathname) : null;
+  const homeHref = activeHubLocale ? `/${activeHubLocale}` : "/";
+
+  const localizedNavPaths: Record<string, Record<string, string>> = {
+    ar: {
+      reels: "/ar/instagram-reels-download",
+      story: "/ar/instagram-story-saver",
+      photo: "/ar/instagram-photo-download",
+      profile: "/ar/instagram-dp-viewer",
+      audio: "/ar/instagram-audio-mp3",
+    },
+    es: {
+      reels: "/es/descargar-reels-instagram",
+      story: "/es/descargar-historias-instagram",
+      photo: "/es/descargar-fotos-instagram",
+      profile: "/es/descargar-foto-perfil-instagram",
+      audio: "/es/convertir-instagram-a-mp3",
+    },
+    pt: {
+      reels: "/pt/baixar-reels-instagram",
+      story: "/pt/baixar-stories-instagram",
+      photo: "/pt/baixar-fotos-instagram",
+      profile: "/pt/baixar-foto-perfil-instagram",
+      audio: "/pt/converter-instagram-para-mp3",
+    },
+    fr: {
+      reels: "/fr/telecharger-reel-instagram",
+      story: "/fr/telecharger-story-instagram",
+      photo: "/fr/telecharger-photo-instagram",
+      profile: "/fr/telecharger-photo-profil-instagram",
+      audio: "/fr/convertir-instagram-en-mp3",
+    },
+    tr: {
+      reels: "/tr/instagram-reels-indirme",
+      story: "/tr/instagram-hikaye-indirme",
+      photo: "/tr/instagram-fotograf-indirme",
+      profile: "/tr/instagram-profil-fotografi-buyutme",
+      audio: "/tr/instagram-mp3-ses-indirme",
+    },
+    id: {
+      reels: "/id/download-reels-ig",
+      story: "/id/download-story-ig",
+      photo: "/id/download-foto-ig",
+      profile: "/id/download-foto-profil-ig-hd",
+      audio: "/id/convert-instagram-ke-mp3",
+    },
+    de: {
+      reels: "/de/instagram-reels-herunterladen",
+      story: "/de/instagram-story-herunterladen",
+      photo: "/de/instagram-fotos-herunterladen",
+      profile: "/de/instagram-profilbild-vergroessern-hd",
+      audio: "/de/instagram-in-mp3-umwandeln",
+    },
+    ru: {
+      reels: "/ru/skachat-reels-instagram",
+      story: "/ru/skachat-storis-instagram",
+      photo: "/ru/skachat-foto-instagram",
+      profile: "/ru/skachat-avatarku-instagram-hd",
+      audio: "/ru/konvertirovat-instagram-v-mp3",
+    },
+  };
+
+  const navMap = activeHubLocale ? localizedNavPaths[activeHubLocale] : null;
+
   const navItems = [
     {
-      href: "/reels",
+      href: navMap?.reels || "/reels",
       label: t("navReels") || "ريلز وفيديو (Reels / IG Video)",
       icon: Film,
       isExternal: false,
     },
     {
-      href: "/story-saver",
+      href: navMap?.story || "/story-saver",
       label: t("navStories") || "ستوري (Stories & Viewer)",
       icon: Video,
       isExternal: false,
     },
     {
-      href: "/photo-downloader",
+      href: navMap?.photo || "/photo-downloader",
       label: t("navPhotos") || "صور (Photos)",
       icon: ImageIcon,
       isExternal: false,
     },
     {
-      href: "/profile-downloader",
+      href: navMap?.profile || "/profile-downloader",
       label: t("navAvatar") || "صورة البروفايل (IG Avatar / DP)",
       icon: UserCheck,
       isExternal: false,
     },
     {
-      href: "/audio-downloader",
+      href: navMap?.audio || "/audio-downloader",
       label: t("navAudio") || "صوت (Audio MP3)",
       icon: Music,
       isExternal: false,
@@ -64,12 +130,21 @@ export function Navbar() {
     },
   ];
 
+  const handleLanguageSelect = (targetCode: Locale) => {
+    setLocale(targetCode);
+    setLangMenuOpen(false);
+    const targetPath = resolveLocalizedPath(pathname || "/", targetCode);
+    if (targetPath && targetPath !== pathname) {
+      router.push(targetPath);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-[64px] gap-2">
           {/* Logo & Brand — same palette as Hero/Footer */}
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+          <Link href={homeHref} className="flex items-center gap-2.5 shrink-0 group">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] flex items-center justify-center text-white shadow-md shadow-pink-500/20 group-hover:shadow-pink-500/30 transition-all">
               <Video className="w-5 h-5 fill-white/20 text-white" />
             </div>
@@ -183,10 +258,7 @@ export function Navbar() {
                     {AVAILABLE_LOCALES.map((item) => (
                       <button
                         key={item.code}
-                        onClick={() => {
-                          setLocale(item.code);
-                          setLangMenuOpen(false);
-                        }}
+                        onClick={() => handleLanguageSelect(item.code)}
                         className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-left hover:bg-gray-50 transition-colors cursor-pointer ${
                           locale === item.code ? "text-blue-600 font-bold bg-blue-50/70" : "text-gray-700"
                         }`}

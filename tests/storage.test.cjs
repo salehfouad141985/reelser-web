@@ -16,3 +16,23 @@ test("multiple workers update the same file without lost writes", async () => {
     assert.equal(JSON.parse(fs.readFileSync(path.join(directory, "counter.json"))).value, 36);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
+
+test("stale lock directory left by a crashed process is automatically recovered", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "reelser-stale-lock-"));
+  const previous = process.env.REELSER_DATA_DIR;
+  process.env.REELSER_DATA_DIR = directory;
+  try {
+    const lock = path.join(directory, "stale.json.lock");
+    fs.mkdirSync(lock);
+    const past = new Date(Date.now() - 20_000);
+    fs.utimesSync(lock, past, past);
+    const { transaction } = require("../lib/storage.ts");
+    await transaction("stale", () => ({ ok: false }), data => { data.ok = true; });
+    assert.equal(JSON.parse(fs.readFileSync(path.join(directory, "stale.json"), "utf8")).ok, true);
+    assert.equal(fs.existsSync(lock), false);
+  } finally {
+    if (previous === undefined) delete process.env.REELSER_DATA_DIR;
+    else process.env.REELSER_DATA_DIR = previous;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});

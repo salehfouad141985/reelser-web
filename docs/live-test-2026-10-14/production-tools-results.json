@@ -1,0 +1,119 @@
+[
+  {
+    "name": "mp3",
+    "timestamp": "2026-10-14T18:37:37.609Z",
+    "extractStatus": 200,
+    "download": {
+      "status": 200,
+      "operationId": "82a17f5b-9091-46d6-9cfe-23f9e5c7c77e",
+      "bytes": 1051347,
+      "mime": "audio/mpeg",
+      "signature": true,
+      "decoded": true,
+      "elapsedMs": 1697
+    }
+  },
+  {
+    "name": "photo",
+    "timestamp": "2026-10-14T18:37:40.198Z",
+    "extractStatus": 200,
+    "download": {
+      "status": 200,
+      "operationId": "cdbd3bb7-f49b-4f2a-a46c-d4176c073e34",
+      "bytes": 513702,
+      "mime": "image/jpeg",
+      "signature": true,
+      "decoded": true,
+      "elapsedMs": 578
+    }
+  },
+  {
+    "name": "carousel",
+    "timestamp": "2026-10-14T18:37:42.321Z",
+    "extractStatus": 200,
+    "offered": 3,
+    "downloads": [
+      {
+        "status": 200,
+        "operationId": "731e7831-7b62-44e0-a502-984ca855cc42",
+        "bytes": 589110,
+        "mime": "image/jpeg",
+        "signature": true,
+        "decoded": true,
+        "elapsedMs": 1407
+      },
+      {
+        "status": 200,
+        "operationId": "145433c5-f6f9-4316-9e5d-6fcd82be977a",
+        "bytes": 615498,
+        "mime": "image/jpeg",
+        "signature": true,
+        "decoded": true,
+        "elapsedMs": 1601
+      },
+      {
+        "status": 200,
+        "operationId": "1cb2fe6f-3200-4b2a-8378-801e9249311a",
+        "bytes": 599733,
+        "mime": "image/jpeg",
+        "signature": true,
+        "decoded": true,
+        "elapsedMs": 1387
+      }
+    ]
+  },
+  {
+    "name": "profile-avatar",
+    "timestamp": "2026-10-14T18:37:48.128Z",
+    "extractStatus": 200,
+    "avatarOffered": true,
+    "download": {
+      "status": 200,
+      "operationId": "0de4a8ec-2bc3-40db-9ae2-7f75feb22bac",
+      "bytes": 5003,
+      "mime": "image/jpeg",
+      "signature": true,
+      "decoded": true,
+      "elapsedMs": 1045
+    }
+  },
+  {
+    "name": "stories",
+    "timestamp": "2026-10-14T18:37:53.618Z",
+    "extractStatus": 200,
+    "offered": 2,
+    "downloads": [
+      {
+        "status": 200,
+        "operationId": "990ce851-c6df-4b70-8e2e-07146f9e6f2a",
+        "bytes": 112896,
+        "mime": "image/jpeg",
+        "signature": true,
+        "decoded": true,
+        "elapsedMs": 403
+      },
+      {
+        "status": 200,
+        "operationId": "bbd71577-00ca-4110-b28d-5c0da742fa1c",
+        "bytes": 259340,
+        "mime": "video/mp4",
+        "signature": true,
+        "decoded": true,
+        "elapsedMs": 3303
+      }
+    ]
+  },
+  {
+    "name": "invalid-url",
+    "timestamp": "2026-10-14T18:37:57.724Z",
+    "status": 400,
+    "error": "Please enter a valid Instagram URL or @username / أدخل رابط إنستغرام أو اسم حساب صالح"
+  },
+  {
+    "name": "missing-ticket",
+    "timestamp": "2026-10-14T18:37:57.930Z",
+    "status": 403,
+    "operationId": "ccaeccfb-fa54-4b36-83dd-8b41ee6e9a18",
+    "error": "Media link expired. Extract the link again."
+  }
+]

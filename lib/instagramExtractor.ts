@@ -1,4 +1,4 @@
-import { fetchMedia, mediaKind } from "./safeMedia";
+import { fetchMedia, mediaKind, validateMediaUrl } from "./safeMedia";
 import { SourceFetchError, sourceAttempt, type SourceStage } from "./sourceDiagnostics";
 
 // Bounded source responses and real cancellation, including the response body.
@@ -601,6 +601,102 @@ async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<Snaps
   }
 }
 
+function sanitizeExtractedMediaUrl(raw: string): string | null {
+  const cleaned = raw
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\\//g, "/")
+    .replace(/&amp;/gi, "&")
+    .trim();
+  try {
+    return validateMediaUrl(cleaned).href;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchInstagramEmbedFallback(shortcode: string, signal: AbortSignal): Promise<SnapsaveMediaItem[]> {
+  if (!shortcode || !/^[\w-]+$/.test(shortcode) || signal.aborted) return [];
+  try {
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(7500)]);
+    const response = await fetch(`https://www.instagram.com/p/${encodeURIComponent(shortcode)}/embed/captioned/`, {
+      method: "GET",
+      headers: {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      },
+      redirect: "follow",
+      signal: requestSignal,
+    });
+    if (!response.ok || response.bodyUsed || !response.body) return [];
+    const html = await response.text();
+    if (!html || html.length > 2 * 1024 * 1024) return [];
+
+    const items: SnapsaveMediaItem[] = [];
+    const seen = new Set<string>();
+
+    const videoMatches = [...html.matchAll(/"video_url"\s*:\s*"([^"]+)"/g)];
+    const displayMatches = [...html.matchAll(/"display_url"\s*:\s*"([^"]+)"/g)]
+      .map((m) => sanitizeExtractedMediaUrl(m[1]))
+      .filter((u): u is string => Boolean(u));
+
+    for (let i = 0; i < videoMatches.length; i++) {
+      const videoUrl = sanitizeExtractedMediaUrl(videoMatches[i][1]);
+      if (videoUrl && !seen.has(videoUrl)) {
+        seen.add(videoUrl);
+        items.push({
+          url: videoUrl,
+          thumbnail: displayMatches[i] || displayMatches[0] || videoUrl,
+          type: "video",
+        });
+      }
+    }
+
+    const domVideoMatch = html.match(/class="[^"]*EmbeddedMediaVideo[^"]*"[^>]*src="([^"]+)"/i)
+      || html.match(/src="([^"]+)"[^>]*class="[^"]*EmbeddedMediaVideo[^"]*"/i);
+    const domImgMatch = html.match(/class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i)
+      || html.match(/src="([^"]+)"[^>]*class="[^"]*EmbeddedMediaImage[^"]*"/i);
+
+    const domThumb = domImgMatch ? sanitizeExtractedMediaUrl(domImgMatch[1]) : null;
+    if (domVideoMatch) {
+      const videoUrl = sanitizeExtractedMediaUrl(domVideoMatch[1]);
+      if (videoUrl && !seen.has(videoUrl)) {
+        seen.add(videoUrl);
+        items.push({
+          url: videoUrl,
+          thumbnail: domThumb || displayMatches[0] || videoUrl,
+          type: "video",
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      for (const imgUrl of displayMatches) {
+        if (!seen.has(imgUrl)) {
+          seen.add(imgUrl);
+          items.push({
+            url: imgUrl,
+            thumbnail: imgUrl,
+            type: "image",
+          });
+        }
+      }
+      if (items.length === 0 && domThumb && !seen.has(domThumb)) {
+        seen.add(domThumb);
+        items.push({
+          url: domThumb,
+          thumbnail: domThumb,
+          type: "image",
+        });
+      }
+    }
+
+    return items.slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
 export async function extractInstagramMedia(inputUrl: string, signal: AbortSignal = AbortSignal.timeout(25000)): Promise<MediaResult | null> {
   const cleanUrl = normalizeInstagramMediaUrl(inputUrl);
   if (!cleanUrl) return null;
@@ -673,7 +769,13 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
   try {
     const targetUrl = cleanUrl.startsWith("@")
       ? `https://www.instagram.com/stories/${cleanUrl.slice(1)}/` : cleanUrl;
-    const rawItems = await fetchRawSnapsave(targetUrl, signal);
+    let rawItems = await fetchRawSnapsave(targetUrl, signal);
+    if (rawItems.length === 0 && !signal.aborted) {
+      const fallbackShortcode = extractInstagramShortcode(cleanUrl);
+      if (fallbackShortcode) {
+        rawItems = await fetchInstagramEmbedFallback(fallbackShortcode, signal);
+      }
+    }
     signal.throwIfAborted();
     const mediaData = { media: rawItems, description: "", preview: "" };
 

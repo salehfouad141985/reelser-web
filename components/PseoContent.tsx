@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { PseoPageConfig, REELSER_PSEO_PAGES } from "@/lib/pseo-data";
 import { PseoFaqAccordion } from "./PseoFaqAccordion";
+import { CrossLanguageLinksBar } from "./CrossLanguageLinksBar";
 import {
   Sparkles,
   Zap,
@@ -54,6 +55,7 @@ export function PseoContent({ config }: PseoContentProps) {
               {config.h1}
             </li>
           </ol>
+          <CrossLanguageLinksBar enSlug={config.slug} currentLocale="en" />
         </div>
       </nav>
 

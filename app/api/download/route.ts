@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { recordDownloadStat } from "@/lib/adminStore";
-import { acquireLease, errorResponse, RequestError, servicePolicy } from "@/lib/requestPolicy";
+import { acquireLease, DOWNLOAD_CONCURRENCY, errorResponse, RequestError, servicePolicy } from "@/lib/requestPolicy";
 import { readTicket } from "@/lib/mediaTickets";
 import { fetchMedia, mediaKind } from "@/lib/safeMedia";
 import { convertAudio } from "@/lib/convertAudio";
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     stage = "ticket";
     const ticket = await readTicket(req.nextUrl.searchParams.get("ticket"), "download");
     stage = "lease";
-    release = await acquireLease("download", 4);
+    release = await acquireLease("download", DOWNLOAD_CONCURRENCY);
     const operationSignal = AbortSignal.any([req.signal, AbortSignal.timeout(60_000)]);
     signal = AbortSignal.any([operationSignal, AbortSignal.timeout(20_000)]);
     stage = "fetch";
