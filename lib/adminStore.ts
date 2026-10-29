@@ -135,6 +135,25 @@ async function hashPassword(password: string, salt: string, iterations: number) 
 
 export async function getAdminSettings() { return { ...(await snapshot()).settings }; }
 export async function getAdminStats() { return (await snapshot()).stats; }
+export async function getActiveAdminSessionsCount() {
+  const sessions = (await snapshot()).sessions ?? {};
+  const now = Date.now();
+  return Object.values(sessions).filter((exp) => Number.isFinite(exp) && exp > now).length;
+}
+export function clearAdminActivities() {
+  return change((data) => {
+    data.stats.recentActivities = [];
+    data.stats.lastUpdated = new Date().toISOString();
+    return data.stats;
+  });
+}
+export function revokeOtherAdminSessions(currentToken: string) {
+  const currentHash = sessionHash(currentToken);
+  return change((data) => {
+    const exp = data.sessions?.[currentHash];
+    data.sessions = exp && exp > Date.now() ? { [currentHash]: exp } : {};
+  });
+}
 export function updateAdminSettings(partial: Partial<AdminSettings>) {
   return change(data => {
     data.settings = { ...data.settings, ...partial };
@@ -164,8 +183,8 @@ async function recordActivity(type: ActivityItem["type"], success: boolean) {
       }
       stats.lastUpdated = new Date().toISOString();
       stats.recentActivities = minimizeActivities([{ id: crypto.randomUUID(), type, success,
-        title: type === "extract" ? "Media extraction" : "Media download", timestamp: stats.lastUpdated },
-        ...stats.recentActivities.map(item => ({ ...item, title: "Media request" }))]);
+        title: type === "extract" ? "استخراج بيانات الرابط" : type === "video" ? "تحميل فيديو MP4" : type === "audio" ? "تحميل صوت MP3" : "تحميل صورة HD", timestamp: stats.lastUpdated },
+        ...stats.recentActivities]);
     });
   } catch { console.error("Unable to persist request statistics"); }
 }
