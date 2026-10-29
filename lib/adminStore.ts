@@ -56,11 +56,29 @@ function activityTimestamp(value: string): number {
   return Number.isFinite(ts) ? ts : Date.now();
 }
 
+function activityTitle(type: ActivityItem["type"]): string {
+  return type === "extract"
+    ? "استخراج بيانات الرابط"
+    : type === "video"
+    ? "تحميل فيديو MP4"
+    : type === "audio"
+    ? "تحميل صوت MP3"
+    : "تحميل صورة HD";
+}
+
 function minimizeActivities(activities: ActivityItem[]): ActivityItem[] {
   const cutoff = Date.now() - ACTIVITY_LOG_RETENTION_DAYS * 86_400_000;
   return activities
     .filter((entry) => activityTimestamp(entry.timestamp) >= cutoff)
-    .slice(0, ACTIVITY_LOG_MAX_ENTRIES);
+    .slice(0, ACTIVITY_LOG_MAX_ENTRIES)
+    .map((entry) => ({
+      ...entry,
+      title:
+        !entry.title || /^Media (request|download|extraction)$/i.test(entry.title)
+          ? activityTitle(entry.type)
+          : entry.title,
+      timestamp: new Date(activityTimestamp(entry.timestamp)).toISOString(),
+    }));
 }
 
 const DEFAULT_STATS: AdminStats = {
@@ -94,23 +112,34 @@ function secret() {
 
 function initialData(): AdminData {
   return {
-    password_hash: "", salt: "", iterations: 210000, sessions: {},
-    settings: { ...DEFAULT_SETTINGS }, stats: { ...DEFAULT_STATS, recentActivities: [] },
+    password_hash: "",
+    salt: "",
+    iterations: 210000,
+    sessions: {},
+    settings: { ...DEFAULT_SETTINGS },
+    stats: { ...DEFAULT_STATS, recentActivities: [] },
   };
 }
 
 function normalizeData(data: AdminData): AdminData {
-  if (!data || typeof data.password_hash !== "string" || typeof data.salt !== "string" ||
-      !data.settings || !data.stats || !Array.isArray(data.stats.recentActivities) ||
-      (data.password_hash && (!/^[a-f0-9]{128}$/.test(data.password_hash) || !/^[a-f0-9]{32}$/.test(data.salt))) ||
-      (data.iterations !== undefined && ![10000, 210000].includes(data.iterations)) ||
-      !Number.isInteger(data.settings.max_downloads_per_ip_hour) || data.settings.max_downloads_per_ip_hour < 1 ||
-      data.settings.max_downloads_per_ip_hour > 600 || typeof data.settings.maintenance_mode !== "boolean") {
+  if (
+    !data ||
+    typeof data.password_hash !== "string" ||
+    typeof data.salt !== "string" ||
+    !data.settings ||
+    !data.stats ||
+    !Array.isArray(data.stats.recentActivities) ||
+    (data.password_hash && (!/^[a-f0-9]{128}$/.test(data.password_hash) || !/^[a-f0-9]{32}$/.test(data.salt))) ||
+    (data.iterations !== undefined && ![10000, 210000].includes(data.iterations)) ||
+    !Number.isInteger(data.settings.max_downloads_per_ip_hour) ||
+    data.settings.max_downloads_per_ip_hour < 1 ||
+    data.settings.max_downloads_per_ip_hour > 600 ||
+    typeof data.settings.maintenance_mode !== "boolean"
+  ) {
     throw new Error("Invalid administration storage; restore a valid backup");
   }
   data.settings = { ...DEFAULT_SETTINGS, ...data.settings };
-  data.sessions ??= {}; // Legacy JWTs are intentionally invalid after migration.
-  // نفس minimizeActivityLogs في media-downloader-web — حد 200 واحتفاظ قابل للضبط
+  data.sessions ??= {};
   data.stats.recentActivities = minimizeActivities(data.stats.recentActivities);
   return data;
 }
@@ -120,10 +149,9 @@ async function snapshot() {
 }
 
 function change<R>(fn: (data: AdminData) => R | Promise<R>): Promise<R> {
-  return transaction<AdminData, R>("admin-config", initialData, async data => {
+  return transaction<AdminData, R>("admin-config", initialData, async (data) => {
     normalizeData(data);
     const result = await fn(data);
-    // تقليم ثانية بعد الكتابة لضمان عدم تجاوز الحد
     data.stats.recentActivities = minimizeActivities(data.stats.recentActivities);
     return result;
   });
@@ -133,8 +161,12 @@ async function hashPassword(password: string, salt: string, iterations: number) 
   return (await pbkdf2(password, salt, iterations, 64, "sha512")).toString("hex");
 }
 
-export async function getAdminSettings() { return { ...(await snapshot()).settings }; }
-export async function getAdminStats() { return (await snapshot()).stats; }
+export async function getAdminSettings() {
+  return { ...(await snapshot()).settings };
+}
+export async function getAdminStats() {
+  return (await snapshot()).stats;
+}
 export async function getActiveAdminSessionsCount() {
   const sessions = (await snapshot()).sessions ?? {};
   const now = Date.now();
@@ -155,44 +187,54 @@ export function revokeOtherAdminSessions(currentToken: string) {
   });
 }
 export function updateAdminSettings(partial: Partial<AdminSettings>) {
-  return change(data => {
+  return change((data) => {
     data.settings = { ...data.settings, ...partial };
     return data.settings;
   });
 }
 
-export async function recordExtractionStat(success: boolean) {
-  await recordActivity("extract", success);
+export async function recordExtractionStat(success: boolean, timestamp?: string) {
+  await recordActivity("extract", success, timestamp);
 }
-export async function recordDownloadStat(type: "video" | "audio" | "image") {
-  await recordActivity(type, true);
+export async function recordDownloadStat(type: "video" | "audio" | "image", success = true, timestamp?: string) {
+  await recordActivity(type, success, timestamp);
 }
-async function recordActivity(type: ActivityItem["type"], success: boolean) {
+async function recordActivity(type: ActivityItem["type"], success: boolean, attemptTimestamp?: string) {
   // Telemetry must never turn a completed transfer into a failed one.
   try {
-    await change(data => {
+    await change((data) => {
       const stats = data.stats;
       if (type === "extract") {
         stats.totalExtractions++;
-        if (success) stats.successfulExtractions++; else stats.failedExtractions++;
-      } else {
+        if (success) stats.successfulExtractions++;
+        else stats.failedExtractions++;
+      } else if (success) {
         stats.totalDownloads++;
         if (type === "video") stats.videoDownloads++;
         else if (type === "audio") stats.audioDownloads++;
         else stats.photoDownloads++;
       }
       stats.lastUpdated = new Date().toISOString();
-      stats.recentActivities = minimizeActivities([{ id: crypto.randomUUID(), type, success,
-        title: type === "extract" ? "استخراج بيانات الرابط" : type === "video" ? "تحميل فيديو MP4" : type === "audio" ? "تحميل صوت MP3" : "تحميل صورة HD", timestamp: stats.lastUpdated },
-        ...stats.recentActivities]);
+      stats.recentActivities = minimizeActivities([
+        {
+          id: crypto.randomUUID(),
+          type,
+          success,
+          title: activityTitle(type),
+          timestamp: attemptTimestamp || stats.lastUpdated,
+        },
+        ...stats.recentActivities,
+      ]);
     });
-  } catch { console.error("Unable to persist request statistics"); }
+  } catch {
+    console.error("Unable to persist request statistics");
+  }
 }
 
 export async function verifyAdminCredentials(username: string, password: string) {
   secret();
   if (username !== "admin" || password === "Admin@Reelser2026!" || password.length > 1024) return false;
-  return change(data => credentialsMatch(data, password));
+  return change((data) => credentialsMatch(data, password));
 }
 
 async function credentialsMatch(data: AdminData, password: string) {
@@ -214,8 +256,8 @@ async function credentialsMatch(data: AdminData, password: string) {
 export async function authenticateAdmin(username: string, password: string) {
   secret();
   if (username !== "admin" || password === "Admin@Reelser2026!" || password.length > 1024) return null;
-  return change(async data => {
-    if (!await credentialsMatch(data, password)) return null;
+  return change(async (data) => {
+    if (!(await credentialsMatch(data, password))) return null;
     return issueSession(data);
   });
 }
@@ -223,7 +265,7 @@ export async function authenticateAdmin(username: string, password: string) {
 export async function updateAdminPassword(password: string) {
   secret();
   if (typeof password !== "string" || password.length < 16 || password.length > 1024) return false;
-  return change(async data => {
+  return change(async (data) => {
     data.salt = crypto.randomBytes(16).toString("hex");
     data.iterations = 210000;
     data.password_hash = await hashPassword(password, data.salt, data.iterations);
@@ -243,7 +285,11 @@ export async function createAdminToken() {
 function issueSession(data: AdminData) {
   const token = crypto.randomBytes(32).toString("base64url");
   const hash = sessionHash(token);
-  data.sessions = Object.fromEntries(Object.entries(data.sessions!).filter(([, exp]) => exp > Date.now()).slice(-19));
+  data.sessions = Object.fromEntries(
+    Object.entries(data.sessions!)
+      .filter(([, exp]) => exp > Date.now())
+      .slice(-19)
+  );
   data.sessions[hash] = Date.now() + 86400_000;
   return token;
 }
@@ -253,9 +299,13 @@ export async function verifyAdminToken(token: string) {
     const hash = sessionHash(token);
     const exp = (await snapshot()).sessions![hash];
     return Number.isFinite(exp) && exp > Date.now();
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 export async function revokeAdminToken(token: string) {
   const hash = sessionHash(token);
-  await change(data => { delete data.sessions![hash]; });
+  await change((data) => {
+    delete data.sessions![hash];
+  });
 }

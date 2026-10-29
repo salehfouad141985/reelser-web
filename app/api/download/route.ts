@@ -10,12 +10,15 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   let release: (() => Promise<void>) | undefined;
   const attempt = downloadAttempt();
+  const attemptTime = new Date().toISOString();
   let stage: DownloadStage = "policy";
   let signal: AbortSignal = req.signal;
+  let type: "audio" | "video" | "image" = "video";
   try {
     await servicePolicy(req, "download");
     stage = "ticket";
     const ticket = await readTicket(req.nextUrl.searchParams.get("ticket"), "download");
+    if (ticket.audio) type = "audio";
     stage = "lease";
     release = await acquireLease("download", DOWNLOAD_CONCURRENCY);
     const operationSignal = AbortSignal.any([req.signal, AbortSignal.timeout(60_000)]);
@@ -27,32 +30,46 @@ export async function GET(req: NextRequest) {
     const kind = mediaKind(bytes);
     let mime: string = kind.mime;
     let ext: string = kind.ext;
-    let type: "audio" | "video" | "image" = kind.type;
+    type = kind.type;
     if (ticket.audio) {
       if (kind.type !== "video") throw new RequestError("Audio source is not a video", 415);
       stage = "convert";
       bytes = await convertAudio(bytes, signal);
-      mime = "audio/mpeg"; ext = "mp3"; type = "audio";
+      mime = "audio/mpeg";
+      ext = "mp3";
+      type = "audio";
     }
     signal.throwIfAborted();
     // Counts fully prepared files, not confirmation that the browser saved them.
     stage = "statistics";
-    await recordDownloadStat(type);
+    await recordDownloadStat(type, true, attemptTime);
     stage = "response";
-    return new Response(new Uint8Array(bytes), { headers: {
-      "X-Request-Id": attempt.operationId,
-      "Content-Type": mime, "Content-Length": String(bytes.length),
-      "Content-Disposition": `attachment; filename="reelser-media.${ext}"`,
-      "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox",
-      "Cache-Control": "private, no-store",
-    } });
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        "X-Request-Id": attempt.operationId,
+        "Content-Type": mime,
+        "Content-Length": String(bytes.length),
+        "Content-Disposition": `attachment; filename="reelser-media.${ext}"`,
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "Cache-Control": "private, no-store",
+      },
+    });
   } catch (error) {
-    const failure = signal.aborted ? new RequestError(signal.reason instanceof Error && signal.reason.name === "TimeoutError"
-      ? "Download timed out. Try again." : "Download cancelled.", signal.reason instanceof Error && signal.reason.name === "TimeoutError" ? 504 : 499) : error;
+    await recordDownloadStat(type, false, attemptTime);
+    const failure = signal.aborted
+      ? new RequestError(
+          signal.reason instanceof Error && signal.reason.name === "TimeoutError"
+            ? "Download timed out. Try again."
+            : "Download cancelled.",
+          signal.reason instanceof Error && signal.reason.name === "TimeoutError" ? 504 : 499
+        )
+      : error;
     const response = errorResponse(failure);
     attempt.failure(stage, error, signal, response.status);
     response.headers.set("X-Request-Id", attempt.operationId);
     return response;
+  } finally {
+    await release?.();
   }
-  finally { await release?.(); }
 }

@@ -113,6 +113,57 @@ function formatUptime(seconds?: number): string {
   return `${Math.max(1, m)} دقيقة`;
 }
 
+function formatExactActivityTime(rawTimestamp: string) {
+  const normalized = rawTimestamp.includes("T") ? rawTimestamp : rawTimestamp.replace(" ", "T") + "Z";
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) {
+    return { dateStr: "—", time24: rawTimestamp, time12: "", relative: "" };
+  }
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh24 = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const sec = String(d.getSeconds()).padStart(2, "0");
+  const hours12 = d.getHours() % 12 || 12;
+  const ampm = d.getHours() >= 12 ? "PM" : "AM";
+  const time12 = `${String(hours12).padStart(2, "0")}:${min}:${sec} ${ampm}`;
+
+  const diffSec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  let relative = "الآن";
+  if (diffSec >= 86400) {
+    const days = Math.floor(diffSec / 86400);
+    relative = days === 1 ? "منذ يوم واحد" : days === 2 ? "منذ يومين" : `منذ ${days} أيام`;
+  } else if (diffSec >= 3600) {
+    const hours = Math.floor(diffSec / 3600);
+    const mins = Math.floor((diffSec % 3600) / 60);
+    relative = mins > 0 ? `منذ ${hours} س و ${mins} د` : `منذ ${hours} ساعة`;
+  } else if (diffSec >= 60) {
+    const mins = Math.floor(diffSec / 60);
+    const secs = diffSec % 60;
+    relative = secs > 0 && mins < 10 ? `منذ ${mins} د و ${secs} ث` : `منذ ${mins} دقيقة`;
+  } else if (diffSec > 0) {
+    relative = `منذ ${diffSec} ثانية`;
+  }
+
+  return {
+    dateStr: `${yyyy}-${mm}-${dd}`,
+    time24: `${hh24}:${min}:${sec}`,
+    time12,
+    relative,
+  };
+}
+
+function formatActivityTitle(act: ActivityItem): string {
+  if (!act.title || /^Media (request|download|extraction)$/i.test(act.title)) {
+    if (act.type === "video") return "محاولة تحميل فيديو MP4";
+    if (act.type === "audio") return "محاولة تحميل صوت MP3";
+    if (act.type === "image") return "محاولة تحميل صورة HD";
+    return "محاولة فحص واستخراج رابط";
+  }
+  return act.title;
+}
+
 export default function ReelserAdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [usernameInput, setUsernameInput] = useState("");
@@ -452,9 +503,15 @@ export default function ReelserAdminPage() {
       }
       if (activitySearch.trim()) {
         const q = activitySearch.trim().toLowerCase();
+        const t = formatExactActivityTime(item.timestamp);
+        const title = formatActivityTitle(item).toLowerCase();
         return (
+          title.includes(q) ||
           (item.title || "").toLowerCase().includes(q) ||
-          item.type.toLowerCase().includes(q)
+          item.type.toLowerCase().includes(q) ||
+          t.dateStr.toLowerCase().includes(q) ||
+          t.time24.toLowerCase().includes(q) ||
+          t.time12.toLowerCase().includes(q)
         );
       }
       return true;
@@ -990,11 +1047,13 @@ export default function ReelserAdminPage() {
                     const isAudio = act.type === "audio";
                     const isVideo = act.type === "video";
                     const isImage = act.type === "image";
+                    const timeInfo = formatExactActivityTime(act.timestamp);
+                    const displayTitle = formatActivityTitle(act);
 
                     return (
                       <div
                         key={act.id}
-                        className="p-3.5 bg-slate-900/60 hover:bg-slate-800/40 flex items-center justify-between gap-3 text-xs transition-colors"
+                        className="p-3.5 bg-slate-900/60 hover:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span
@@ -1020,24 +1079,30 @@ export default function ReelserAdminPage() {
                           </span>
 
                           <div className="min-w-0">
-                            <p className="font-semibold text-white truncate">
-                              {act.title || "عملية معالجة وسائط"}
+                            <p className="font-bold text-white truncate">
+                              {displayTitle}
                             </p>
-                            <span className="text-[11px] text-slate-400">
-                              {isAudio
-                                ? "تحميل صوت MP3"
-                                : isVideo
-                                ? "تحميل فيديو MP4"
-                                : isImage
-                                ? "تحميل صورة HD"
-                                : "استخراج بيانات الرابط"}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                              <span>
+                                {isAudio
+                                  ? "تحميل صوت MP3"
+                                  : isVideo
+                                  ? "تحميل فيديو MP4"
+                                  : isImage
+                                  ? "تحميل صورة HD"
+                                  : "استخراج بيانات الرابط"}
+                              </span>
+                              <span className="text-slate-600">•</span>
+                              <span className="text-pink-400/90 font-semibold">
+                                {timeInfo.relative}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
                               act.success
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                 : "bg-red-500/10 text-red-400 border border-red-500/20"
@@ -1045,13 +1110,20 @@ export default function ReelserAdminPage() {
                           >
                             {act.success ? "ناجح ✓" : "فشل ✕"}
                           </span>
-                          <span className="text-[11px] text-slate-500">
-                            {new Date(act.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </span>
+
+                          <div
+                            dir="ltr"
+                            title={act.timestamp}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/90 border border-slate-800 text-[11px] font-mono text-slate-200"
+                          >
+                            <Clock className="w-3 h-3 text-pink-400 shrink-0" />
+                            <span className="text-slate-400">{timeInfo.dateStr}</span>
+                            <span className="text-slate-600">|</span>
+                            <span className="font-bold text-white">{timeInfo.time24}</span>
+                            {timeInfo.time12 && (
+                              <span className="text-[10px] text-slate-400">({timeInfo.time12})</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
