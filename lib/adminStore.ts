@@ -7,6 +7,7 @@ export interface ActivityItem {
   id: string;
   type: "video" | "audio" | "image" | "extract";
   title: string;
+  url?: string;
   timestamp: string;
   success: boolean;
 }
@@ -66,19 +67,29 @@ function activityTitle(type: ActivityItem["type"]): string {
     : "تحميل صورة HD";
 }
 
+function sanitizeActivityUrl(value?: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value.replace(/[\r\n\t\0]+/g, " ").trim();
+  return cleaned ? cleaned.slice(0, 500) : undefined;
+}
+
 function minimizeActivities(activities: ActivityItem[]): ActivityItem[] {
   const cutoff = Date.now() - ACTIVITY_LOG_RETENTION_DAYS * 86_400_000;
   return activities
     .filter((entry) => activityTimestamp(entry.timestamp) >= cutoff)
     .slice(0, ACTIVITY_LOG_MAX_ENTRIES)
-    .map((entry) => ({
-      ...entry,
-      title:
-        !entry.title || /^Media (request|download|extraction)$/i.test(entry.title)
-          ? activityTitle(entry.type)
-          : entry.title,
-      timestamp: new Date(activityTimestamp(entry.timestamp)).toISOString(),
-    }));
+    .map((entry) => {
+      const cleanUrl = sanitizeActivityUrl(entry.url);
+      return {
+        ...entry,
+        title:
+          !entry.title || /^Media (request|download|extraction)$/i.test(entry.title)
+            ? activityTitle(entry.type)
+            : entry.title,
+        ...(cleanUrl ? { url: cleanUrl } : {}),
+        timestamp: new Date(activityTimestamp(entry.timestamp)).toISOString(),
+      };
+    });
 }
 
 const DEFAULT_STATS: AdminStats = {
@@ -193,15 +204,26 @@ export function updateAdminSettings(partial: Partial<AdminSettings>) {
   });
 }
 
-export async function recordExtractionStat(success: boolean, timestamp?: string) {
-  await recordActivity("extract", success, timestamp);
+export async function recordExtractionStat(success: boolean, timestamp?: string, url?: string) {
+  await recordActivity("extract", success, timestamp, url);
 }
-export async function recordDownloadStat(type: "video" | "audio" | "image", success = true, timestamp?: string) {
-  await recordActivity(type, success, timestamp);
+export async function recordDownloadStat(
+  type: "video" | "audio" | "image",
+  success = true,
+  timestamp?: string,
+  url?: string
+) {
+  await recordActivity(type, success, timestamp, url);
 }
-async function recordActivity(type: ActivityItem["type"], success: boolean, attemptTimestamp?: string) {
+async function recordActivity(
+  type: ActivityItem["type"],
+  success: boolean,
+  attemptTimestamp?: string,
+  url?: string
+) {
   // Telemetry must never turn a completed transfer into a failed one.
   try {
+    const cleanUrl = sanitizeActivityUrl(url);
     await change((data) => {
       const stats = data.stats;
       if (type === "extract") {
@@ -221,6 +243,7 @@ async function recordActivity(type: ActivityItem["type"], success: boolean, atte
           type,
           success,
           title: activityTitle(type),
+          ...(cleanUrl ? { url: cleanUrl } : {}),
           timestamp: attemptTimestamp || stats.lastUpdated,
         },
         ...stats.recentActivities,

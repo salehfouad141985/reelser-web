@@ -3,7 +3,7 @@ import { readSnapshot, transaction } from "./storage";
 import { validateMediaUrl } from "./safeMedia";
 import { RequestError } from "./requestPolicy";
 import type { MediaResult } from "./instagramExtractor";
-interface Ticket { url: string; kind: "preview" | "download"; audio: boolean; expires: number }
+interface Ticket { url: string; sourceUrl?: string; kind: "preview" | "download"; audio: boolean; expires: number }
 type Tickets = Record<string, Ticket>;
 export async function readTicket(id: string | null, kind: Ticket["kind"]) {
   if (!id || !/^[\w-]{32}$/.test(id)) throw new RequestError("Invalid media ticket", 403);
@@ -16,6 +16,7 @@ export async function authorizeMedia(result: MediaResult): Promise<MediaResult> 
     for (const [id, ticket] of Object.entries(data)) if (ticket.expires <= Date.now()) delete data[id];
     let count = Object.keys(data).length;
     if (count > 20000) throw new RequestError("Service busy", 429);
+    const sourceUrl = typeof result.url === "string" && result.url.trim() ? result.url.trim().slice(0, 500) : undefined;
     const issued = new Map<string, string>();
     const issue = (url: string, kind: Ticket["kind"], audio = false): string => {
       try { validateMediaUrl(url); } catch { return ""; }
@@ -24,7 +25,7 @@ export async function authorizeMedia(result: MediaResult): Promise<MediaResult> 
       if (existing) return existing;
       if (count >= 20000) throw new RequestError("Service busy", 429);
       const id = crypto.randomBytes(24).toString("base64url");
-      data[id] = { url, kind, audio, expires: Date.now() + 15 * 60_000 };
+      data[id] = { url, kind, audio, expires: Date.now() + 15 * 60_000, ...(sourceUrl ? { sourceUrl } : {}) };
       count++;
       const link = `/api/${kind === "preview" ? "proxy" : "download"}?ticket=${id}`;
       issued.set(key, link);

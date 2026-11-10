@@ -14,10 +14,12 @@ export async function GET(req: NextRequest) {
   let stage: DownloadStage = "policy";
   let signal: AbortSignal = req.signal;
   let type: "audio" | "video" | "image" = "video";
+  let targetUrl: string | undefined;
   try {
     await servicePolicy(req, "download");
     stage = "ticket";
     const ticket = await readTicket(req.nextUrl.searchParams.get("ticket"), "download");
+    targetUrl = ticket.sourceUrl || ticket.url;
     if (ticket.audio) type = "audio";
     stage = "lease";
     release = await acquireLease("download", DOWNLOAD_CONCURRENCY);
@@ -42,7 +44,7 @@ export async function GET(req: NextRequest) {
     signal.throwIfAborted();
     // Counts fully prepared files, not confirmation that the browser saved them.
     stage = "statistics";
-    await recordDownloadStat(type, true, attemptTime);
+    await recordDownloadStat(type, true, attemptTime, targetUrl);
     stage = "response";
     return new Response(new Uint8Array(bytes), {
       headers: {
@@ -56,7 +58,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    await recordDownloadStat(type, false, attemptTime);
+    await recordDownloadStat(type, false, attemptTime, targetUrl);
     const failure = signal.aborted
       ? new RequestError(
           signal.reason instanceof Error && signal.reason.name === "TimeoutError"

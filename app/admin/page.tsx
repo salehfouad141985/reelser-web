@@ -33,12 +33,16 @@ import {
   Sparkles,
   ShieldCheck,
   Filter,
+  Link2,
+  Copy,
+  Check,
 } from "lucide-react";
 
 interface ActivityItem {
   id: string;
   type: "video" | "audio" | "image" | "extract";
   title: string;
+  url?: string;
   timestamp: string;
   success: boolean;
 }
@@ -183,6 +187,7 @@ export default function ReelserAdminPage() {
   const [activityFilter, setActivityFilter] = useState<"all" | "video" | "audio" | "image" | "extract" | "failed">("all");
   const [activitySearch, setActivitySearch] = useState("");
   const [isClearingLogs, setIsClearingLogs] = useState(false);
+  const [copiedActivityId, setCopiedActivityId] = useState<string | null>(null);
 
   // Settings form
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -508,6 +513,7 @@ export default function ReelserAdminPage() {
         return (
           title.includes(q) ||
           (item.title || "").toLowerCase().includes(q) ||
+          (item.url || "").toLowerCase().includes(q) ||
           item.type.toLowerCase().includes(q) ||
           t.dateStr.toLowerCase().includes(q) ||
           t.time24.toLowerCase().includes(q) ||
@@ -1055,7 +1061,7 @@ export default function ReelserAdminPage() {
                         key={act.id}
                         className="p-3.5 bg-slate-900/60 hover:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                           <span
                             className={`p-2 rounded-lg shrink-0 ${
                               isAudio
@@ -1078,7 +1084,7 @@ export default function ReelserAdminPage() {
                             )}
                           </span>
 
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="font-bold text-white truncate">
                               {displayTitle}
                             </p>
@@ -1097,6 +1103,56 @@ export default function ReelserAdminPage() {
                                 {timeInfo.relative}
                               </span>
                             </div>
+                            {act.url && (
+                              <div className="mt-1.5 flex items-center gap-1.5 min-w-0">
+                                <div
+                                  dir="ltr"
+                                  className="inline-flex items-center gap-1.5 min-w-0 max-w-full px-2 py-1 rounded-lg bg-slate-950/80 border border-slate-800/90 text-[11px] font-mono"
+                                >
+                                  <Link2 className="w-3 h-3 text-sky-400 shrink-0" />
+                                  {/^https?:\/\//i.test(act.url) ? (
+                                    <a
+                                      href={act.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title={act.url}
+                                      className="text-sky-300 hover:text-sky-200 hover:underline truncate max-w-[260px] sm:max-w-[440px] lg:max-w-[560px]"
+                                    >
+                                      {act.url}
+                                    </a>
+                                  ) : (
+                                    <span
+                                      title={act.url}
+                                      className="text-slate-300 truncate max-w-[260px] sm:max-w-[440px] lg:max-w-[560px]"
+                                    >
+                                      {act.url}
+                                    </span>
+                                  )}
+                                  {/^https?:\/\//i.test(act.url) && (
+                                    <ExternalLink className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  title="نسخ الرابط"
+                                  onClick={() => {
+                                    if (!act.url) return;
+                                    navigator.clipboard?.writeText(act.url).catch(() => {});
+                                    setCopiedActivityId(act.id);
+                                    setTimeout(() => {
+                                      setCopiedActivityId((curr) => (curr === act.id ? null : curr));
+                                    }, 2000);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/70 transition-colors shrink-0 cursor-pointer"
+                                >
+                                  {copiedActivityId === act.id ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
 

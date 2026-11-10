@@ -8,16 +8,23 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   let release: (() => Promise<void>) | undefined;
   const attemptTime = new Date().toISOString();
+  let requestedUrl: string | undefined;
   try {
     assertSameOrigin(req);
     await servicePolicy(req, "extract");
     const body = await readJson(req, 4096);
+    if (typeof body.url === "string" && body.url.trim()) {
+      requestedUrl = body.url.trim().slice(0, 500);
+    }
     if (typeof body.url !== "string" || body.url.length > 2048 || !isValidInstagramUrl(body.url)) {
       throw new RequestError("Please enter a valid Instagram URL or @username / أدخل رابط إنستغرام أو اسم حساب صالح");
     }
     release = await acquireLease("extract", EXTRACTION_CONCURRENCY);
     const username = extractInstagramUsername(body.url);
     const input = body.tab === "story" && username ? `https://www.instagram.com/stories/${username}/` : body.url;
+    if (username && !/^https?:\/\//i.test(requestedUrl || "")) {
+      requestedUrl = input;
+    }
     const signal = AbortSignal.any([req.signal, AbortSignal.timeout(25000)]);
     const result =
       username && sourceEnabled()
@@ -37,10 +44,10 @@ export async function POST(req: NextRequest) {
     const data = await authorizeMedia(result);
     if (!data.formats.length && data.profileData?.source !== "selfHosted")
       throw new RequestError("The media source is not supported", 422);
-    await recordExtractionStat(true, attemptTime);
+    await recordExtractionStat(true, attemptTime, requestedUrl);
     return Response.json({ success: true, data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    await recordExtractionStat(false, attemptTime);
+    await recordExtractionStat(false, attemptTime, requestedUrl);
     return errorResponse(error);
   } finally {
     await release?.();
