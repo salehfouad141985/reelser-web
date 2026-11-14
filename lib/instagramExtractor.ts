@@ -539,11 +539,8 @@ function canonicalSnapsaveUrl(input: string): string {
   try {
     const parsed = new URL(input);
     if (!["instagram.com", "www.instagram.com"].includes(parsed.hostname)) return input;
-    // Keep story_media_id / highlight params on /s/ and /stories/, strip tracking params elsewhere
-    if (!/^\/(?:s|stories)\//i.test(parsed.pathname)) {
-      parsed.search = "";
-      parsed.hash = "";
-    }
+    parsed.search = "";
+    parsed.hash = "";
     return parsed.href;
   } catch {
     return input;
@@ -552,15 +549,16 @@ function canonicalSnapsaveUrl(input: string): string {
 
 async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<SnapsaveMediaItem[]> {
   const canonical = canonicalSnapsaveUrl(url);
-  const first = await fetchRawSnapsaveOnce(url, signal);
+  const firstTarget = /^\/s\//i.test((() => { try { return new URL(url).pathname; } catch { return ""; } })()) ? canonical : url;
+  const first = await fetchRawSnapsaveOnce(firstTarget, signal, 13000);
   if (first.items.length > 0 || signal.aborted) {
     return first.items;
   }
-  const retryUrl = canonical !== url ? canonical : url;
-  if (canonical !== url || first.retryable) {
+  const retryUrl = canonical !== firstTarget ? canonical : url;
+  if (retryUrl !== firstTarget || first.retryable) {
     await new Promise((r) => setTimeout(r, 250));
     if (signal.aborted) return [];
-    const second = await fetchRawSnapsaveOnce(retryUrl, signal);
+    const second = await fetchRawSnapsaveOnce(retryUrl, signal, 9000);
     return second.items;
   }
   return [];
@@ -568,7 +566,8 @@ async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<Snaps
 
 async function fetchRawSnapsaveOnce(
   url: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timeoutMs = 13000
 ): Promise<{ items: SnapsaveMediaItem[]; retryable: boolean }> {
   const logFailure = sourceAttempt("snapsave");
   let stage: SourceStage = "request";
@@ -579,7 +578,7 @@ async function fetchRawSnapsaveOnce(
     const formData = new URLSearchParams();
     formData.append("url", url);
 
-    requestSignal = AbortSignal.any([signal, AbortSignal.timeout(9000)]);
+    requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
     const response = await fetchSource("https://snapsave.app/action.php?lang=en", {
       method: "POST",
       headers: {
