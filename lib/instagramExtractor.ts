@@ -123,7 +123,7 @@ export function extractInstagramUsername(input: string): string | null {
 
   // If starts with @, e.g. @cristiano or @user.name
   if (trimmed.startsWith("@")) {
-    const candidate = trimmed.slice(1).trim();
+    const candidate = trimmed.slice(1).trim().toLowerCase();
     if (/^[a-zA-Z0-9._]{1,30}$/.test(candidate)) {
       return candidate;
     }
@@ -147,7 +147,7 @@ export function extractInstagramUsername(input: string): string | null {
 
   // Plain username: 2-30 characters, alphanumeric with dot or underscore, no spaces, slashes, or colons
   if (/^[a-zA-Z0-9._]{2,30}$/.test(trimmed) && !trimmed.includes("/") && !trimmed.includes(":") && !trimmed.includes(" ")) {
-    return trimmed;
+    return trimmed.toLowerCase();
   }
 
   return null;
@@ -316,7 +316,7 @@ export async function extractInstagramProfile(username: string, signal: AbortSig
         const res = await fetchSource(`https://www.instagram.com/${clean}/`, {
           headers: chromeHeaders,
           cache: "no-store",
-          signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+          signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
         });
 
         if (!res.ok) return null;
@@ -539,6 +539,16 @@ function canonicalSnapsaveUrl(input: string): string {
   try {
     const parsed = new URL(input);
     if (!["instagram.com", "www.instagram.com"].includes(parsed.hostname)) return input;
+    const sMatch = parsed.pathname.match(/^\/s\/([A-Za-z0-9+/=_-]+)\/?$/);
+    if (sMatch) {
+      try {
+        const decoded = Buffer.from(sMatch[1], "base64").toString("utf8");
+        const hlMatch = decoded.match(/^highlight:(\d+)$/i);
+        if (hlMatch) {
+          return `https://www.instagram.com/stories/highlights/${hlMatch[1]}/`;
+        }
+      } catch {}
+    }
     parsed.search = "";
     parsed.hash = "";
     return parsed.href;
@@ -547,18 +557,19 @@ function canonicalSnapsaveUrl(input: string): string {
   }
 }
 
-async function fetchRawSnapsave(url: string, signal: AbortSignal): Promise<SnapsaveMediaItem[]> {
+async function fetchRawSnapsave(url: string, signal: AbortSignal, allowRetry = true): Promise<SnapsaveMediaItem[]> {
   const canonical = canonicalSnapsaveUrl(url);
-  const firstTarget = /^\/s\//i.test((() => { try { return new URL(url).pathname; } catch { return ""; } })()) ? canonical : url;
-  const first = await fetchRawSnapsaveOnce(firstTarget, signal, 13000);
-  if (first.items.length > 0 || signal.aborted) {
+  const isHighlightShare = /^\/s\//i.test((() => { try { return new URL(url).pathname; } catch { return ""; } })());
+  const firstTarget = isHighlightShare ? canonical : url;
+  const first = await fetchRawSnapsaveOnce(firstTarget, signal, allowRetry ? 12000 : 8500);
+  if (first.items.length > 0 || !allowRetry || signal.aborted) {
     return first.items;
   }
   const retryUrl = canonical !== firstTarget ? canonical : url;
   if (retryUrl !== firstTarget || first.retryable) {
     await new Promise((r) => setTimeout(r, 250));
     if (signal.aborted) return [];
-    const second = await fetchRawSnapsaveOnce(retryUrl, signal, 9000);
+    const second = await fetchRawSnapsaveOnce(retryUrl, signal, 8500);
     return second.items;
   }
   return [];
@@ -747,8 +758,8 @@ export async function extractInstagramMedia(inputUrl: string, signal: AbortSigna
 
     const [extractedProfile, postMedia, storyMedia] = await Promise.all([
       extractInstagramProfile(username, signal),
-      fetchRawSnapsave(targetProfileUrl, signal),
-      fetchRawSnapsave(targetStoryUrl, signal),
+      fetchRawSnapsave(targetProfileUrl, signal, false),
+      fetchRawSnapsave(targetStoryUrl, signal, false),
     ]);
     const profileResult = extractedProfile || createFallbackProfileResult(username);
 
