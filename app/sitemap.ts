@@ -9,6 +9,16 @@ import { REELSER_ID_PSEO_PAGES } from "@/lib/pseo-id-data";
 import { REELSER_DE_PSEO_PAGES } from "@/lib/pseo-de-data";
 import { REELSER_RU_PSEO_PAGES } from "@/lib/pseo-ru-data";
 
+// Real content dates. Bump CONTENT_LAST_UPDATED (or a page's own date) only when
+// that page's content actually changes: a lastmod that changes on every request
+// teaches Google to ignore it.
+const CONTENT_LAST_UPDATED = new Date("2026-10-28");
+const PAGE_LAST_UPDATED: Record<string, Date> = {
+  "/terms": new Date("2026-09-28"),
+  "/dmca": new Date("2026-09-28"),
+  "/privacy": new Date("2026-11-16"),
+};
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://reelser.com";
 
@@ -34,70 +44,70 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const coreEntries: MetadataRoute.Sitemap = coreRoutes.map((r) => ({
     url: `${baseUrl}${r.path}`,
-    lastModified: new Date(),
+    lastModified: PAGE_LAST_UPDATED[r.path] ?? CONTENT_LAST_UPDATED,
     changeFrequency: r.changeFrequency,
     priority: r.priority,
   }));
 
   const pseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.8,
   }));
 
   const arPseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_AR_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/ar/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));
 
   const esPseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_ES_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/es/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));
 
   const ptPseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_PT_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/pt/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));
 
   const frPseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_FR_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/fr/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));
 
   const trPseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_TR_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/tr/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));
 
   const idPseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_ID_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/id/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));
 
   const dePseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_DE_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/de/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));
 
   const ruPseoEntries: MetadataRoute.Sitemap = Object.keys(REELSER_RU_PSEO_PAGES).map((slug) => ({
     url: `${baseUrl}/ru/${slug}`,
-    lastModified: new Date(),
+    lastModified: CONTENT_LAST_UPDATED,
     changeFrequency: "weekly" as const,
     priority: 0.85,
   }));

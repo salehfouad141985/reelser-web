@@ -6,8 +6,13 @@ import { getAdminSettings } from "./adminStore";
 export class RequestError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
+let warnedMissingIpHeader = false;
 export function clientKey(request: Request) {
   const header = process.env.REELSER_TRUSTED_IP_HEADER;
+  if (!header && process.env.NODE_ENV === "production" && !warnedMissingIpHeader) {
+    warnedMissingIpHeader = true;
+    console.warn("REELSER_TRUSTED_IP_HEADER is not set: all visitors share one rate-limit quota");
+  }
   const candidate = header ? request.headers.get(header)?.trim() : null;
   // Accept only an explicitly configured single-IP header from a trusted proxy.
   return candidate && isIP(candidate) ? candidate : "shared";

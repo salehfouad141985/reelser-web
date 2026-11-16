@@ -14,14 +14,15 @@ export async function GET(req: NextRequest) {
       getAdminSettings(),
       getAdminStats(),
       getActiveAdminSessionsCount(),
-      readSnapshot<Record<string, number[]>>("rate-limits", () => ({})),
+      readSnapshot<Record<string, { count?: number; expires?: number }>>("rate-limits", () => ({})),
     ]);
 
     const mem = process.memoryUsage();
     const allSitemapEntries = sitemap();
-    const hourAgo = Date.now() - 3_600_000;
+    const now = Date.now();
+    // Rate-limit entries are { count, expires } keyed by a hashed client identifier.
     const activeRateLimitIps = Object.values(rateLimitsStore || {}).filter(
-      (timestamps) => Array.isArray(timestamps) && timestamps.some((t) => t > hourAgo)
+      (entry) => entry && typeof entry.expires === "number" && entry.expires > now
     ).length;
 
     return NextResponse.json(
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
           memoryHeapMB: Math.round(mem.heapUsed / 1024 / 1024),
           activeSessionsCount,
           activeRateLimitIps,
-          selfHostedConfigured: Boolean(process.env.INSTAGRAM_SOURCE_URL),
+          selfHostedConfigured: Boolean(process.env.REELSER_SOURCE_URL),
         },
       },
       { headers: { "Cache-Control": "no-store" } }

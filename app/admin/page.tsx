@@ -201,6 +201,7 @@ export default function ReelserAdminPage() {
   const [previewAdSlot, setPreviewAdSlot] = useState<"top" | "results" | "bottom" | null>(null);
 
   // Password & sessions
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
@@ -457,6 +458,10 @@ export default function ReelserAdminPage() {
     setPwMessage(null);
     setPwError(null);
 
+    if (!currentPassword) {
+      setPwError("أدخل كلمة المرور الحالية");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setPwError("كلمتا المرور غير متطابقتين");
       return;
@@ -470,12 +475,13 @@ export default function ReelserAdminPage() {
       const res = await fetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "change_password", newPassword }),
+        body: JSON.stringify({ action: "change_password", currentPassword, newPassword }),
       });
       const result = await res.json();
       if (res.ok && result.success) {
         setIsAuthenticated(false);
         setLoginError("تم تغيير كلمة المرور. سجّل الدخول مجدداً.");
+        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         setTimeout(() => setPwMessage(null), 5000);
@@ -1475,9 +1481,12 @@ export default function ReelserAdminPage() {
                       <span>{previewAdSlot === "top" ? "إخفاء المعاينة" : "معاينة مظهر الإعلان"}</span>
                     </button>
                     {previewAdSlot === "top" && (
-                      <div
-                        className="mt-2 p-3 rounded-xl bg-white text-slate-900 overflow-x-auto text-center"
-                        dangerouslySetInnerHTML={{ __html: adTopCode }}
+                      <iframe
+                        title="معاينة الإعلان"
+                        sandbox="allow-scripts allow-popups"
+                        referrerPolicy="no-referrer"
+                        srcDoc={adTopCode}
+                        className="mt-2 w-full h-28 rounded-xl bg-white border-0"
                       />
                     )}
                   </div>
@@ -1530,9 +1539,12 @@ export default function ReelserAdminPage() {
                       <span>{previewAdSlot === "results" ? "إخفاء المعاينة" : "معاينة مظهر الإعلان"}</span>
                     </button>
                     {previewAdSlot === "results" && (
-                      <div
-                        className="mt-2 p-3 rounded-xl bg-white text-slate-900 overflow-x-auto text-center"
-                        dangerouslySetInnerHTML={{ __html: adResultsCode }}
+                      <iframe
+                        title="معاينة الإعلان"
+                        sandbox="allow-scripts allow-popups"
+                        referrerPolicy="no-referrer"
+                        srcDoc={adResultsCode}
+                        className="mt-2 w-full h-28 rounded-xl bg-white border-0"
                       />
                     )}
                   </div>
@@ -1585,9 +1597,12 @@ export default function ReelserAdminPage() {
                       <span>{previewAdSlot === "bottom" ? "إخفاء المعاينة" : "معاينة مظهر الإعلان"}</span>
                     </button>
                     {previewAdSlot === "bottom" && (
-                      <div
-                        className="mt-2 p-3 rounded-xl bg-white text-slate-900 overflow-x-auto text-center"
-                        dangerouslySetInnerHTML={{ __html: adBottomCode }}
+                      <iframe
+                        title="معاينة الإعلان"
+                        sandbox="allow-scripts allow-popups"
+                        referrerPolicy="no-referrer"
+                        srcDoc={adBottomCode}
+                        className="mt-2 w-full h-28 rounded-xl bg-white border-0"
                       />
                     )}
                   </div>
@@ -1746,6 +1761,20 @@ export default function ReelserAdminPage() {
               )}
 
               <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    كلمة المرور الحالية
+                  </label>
+                  <input
+                    type={showPasswords ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="••••••••••••••••"
+                    className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-pink-500"
+                  />
+                </div>
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-semibold text-slate-300">

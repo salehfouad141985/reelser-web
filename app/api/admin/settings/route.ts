@@ -7,7 +7,7 @@ import {
   revokeOtherAdminSessions,
   type AdminSettings,
 } from "@/lib/adminStore";
-import { assertSameOrigin, errorResponse, readJson, RequestError } from "@/lib/requestPolicy";
+import { assertSameOrigin, clientKey, errorResponse, rateLimit, readJson, RequestError } from "@/lib/requestPolicy";
 
 function containsDangerousBannerMarkup(html: string): boolean {
   const lower = html.toLowerCase();
@@ -62,9 +62,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "change_password") {
-      if (typeof body.newPassword !== "string" || !(await updateAdminPassword(body.newPassword))) {
-        throw new RequestError("كلمة المرور يجب أن تكون بين 16 و1024 حرفاً");
-      }
+      await rateLimit(`password:${clientKey(req)}`, 5, 15 * 60_000);
+      const outcome = await updateAdminPassword(
+        typeof body.currentPassword === "string" ? body.currentPassword : "",
+        typeof body.newPassword === "string" ? body.newPassword : ""
+      );
+      if (outcome === "invalid_new") throw new RequestError("كلمة المرور يجب أن تكون بين 16 و1024 حرفاً");
+      if (outcome === "invalid_current") throw new RequestError("كلمة المرور الحالية غير صحيحة", 403);
       const response = NextResponse.json({ success: true, message: "تم تغيير كلمة المرور. سجّل الدخول مجدداً." });
       response.cookies.delete("reelser_admin_session");
       return response;
