@@ -155,7 +155,7 @@ export default function PortugueseHomePage() {
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">
-                Qualidade Original 1080p sem Marca d'Água
+                Qualidade Original 1080p sem Marca d&apos;Água
               </h3>
               <p className="text-sm text-gray-600 leading-relaxed">
                 Baixe o arquivo MP4 ou JPG nativo sem compressão adicional e sem logotipos sobrepostos.

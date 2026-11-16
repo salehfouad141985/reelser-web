@@ -86,6 +86,10 @@ test("failed lease release preserves the prepared download and its statistic", a
   assert.equal((await response.arrayBuffer()).byteLength, 4);
   assert.equal((await admin.getAdminStats()).totalDownloads, before + 1);
   assert.equal(logs.mock.callCount(), 1);
+  // The simulated failure intentionally leaks one lease until it expires; clear
+  // it so later tests start with the full download capacity.
+  t.mock.restoreAll();
+  await storage.transaction("leases-download", () => ({}), data => { for (const key of Object.keys(data)) delete data[key]; });
 });
 
 test("settings, stats, session verification and tickets can be read without any writes", async t => {
@@ -132,7 +136,7 @@ test("password resets revoke sessions issued by authenticated login", async () =
   const token = await admin.authenticateAdmin("admin", process.env.REELSER_ADMIN_PASS);
   assert.match(token, /^[\w-]{43}$/);
   assert.equal(await admin.verifyAdminToken(token), true);
-  await admin.updateAdminPassword("new-regression-only-password");
+  assert.equal(await admin.updateAdminPassword(process.env.REELSER_ADMIN_PASS, "new-regression-only-password"), "ok");
   assert.equal(await admin.verifyAdminToken(token), false);
   assert.equal(await admin.authenticateAdmin("admin", process.env.REELSER_ADMIN_PASS), null);
   assert.ok(await admin.authenticateAdmin("admin", "new-regression-only-password"));

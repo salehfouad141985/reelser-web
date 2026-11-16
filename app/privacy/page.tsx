@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <h1 className="text-3xl font-extrabold text-gray-900 mb-6">Privacy Policy</h1>
-      <p className="text-sm text-gray-500 mb-8">Last updated: September 2026</p>
+      <p className="text-sm text-gray-500 mb-8">Last updated: November 16, 2026</p>
 
       <div className="prose prose-pink max-w-none text-gray-700 space-y-6 text-sm sm:text-base leading-relaxed">
         <section>
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-bold text-gray-900 mb-2">3. Logs & Analytics</h2>
           <p>
-            The application stores aggregate request counts and up to 200 generic activity events without submitted usernames or titles. Activity retention defaults to 30 days and can be configured by the operator from 1 to 90 days. Rate limits use hashed client identifiers when a trusted proxy is configured; expired counters are removed on subsequent requests. Hosting providers may maintain their own access logs. Google Analytics is not loaded by the application. Configured advertisements may contact third-party providers from isolated frames.
+            The application stores aggregate request counts and up to 200 activity events. Each event records the request type, its outcome, a timestamp, and the submitted Instagram link or username (up to 500 characters) so the operator can diagnose failed extractions and downloads. It does not record media titles, visitor IP addresses, or account credentials. Activity retention defaults to 30 days and can be configured by the operator from 1 to 90 days. Rate limits use hashed client identifiers when a trusted proxy is configured; expired counters are removed on subsequent requests. Hosting providers may maintain their own access logs. Google Analytics is not loaded by the application. Configured advertisements may contact third-party providers from isolated frames.
           </p>
         </section>
 

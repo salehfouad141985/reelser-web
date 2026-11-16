@@ -30,7 +30,10 @@ test("sessions expire and revoke on logout, password change and secret rotation"
   await admin.revokeAdminToken(token);
   assert.equal(await admin.verifyAdminToken(token), false);
   const second = await admin.createAdminToken();
-  assert.equal(await admin.updateAdminPassword("a-new-long-test-password"), true);
+  assert.equal(await admin.updateAdminPassword("wrong-current-password!!", "a-new-long-test-password"), "invalid_current");
+  assert.equal(await admin.verifyAdminToken(second), true, "a rejected change must not revoke sessions");
+  assert.equal(await admin.updateAdminPassword(process.env.REELSER_ADMIN_PASS, "short"), "invalid_new");
+  assert.equal(await admin.updateAdminPassword(process.env.REELSER_ADMIN_PASS, "a-new-long-test-password"), "ok");
   assert.equal(await admin.verifyAdminToken(second), false);
   const third = await admin.createAdminToken();
   const key = process.env.ADMIN_JWT_SECRET;
@@ -52,7 +55,7 @@ test("corrupt storage is not reset and write failures propagate", async () => {
   assert.equal(fs.readFileSync(file, "utf8"), "invalid-json");
   fs.writeFileSync(file, original);
   const failure = mock.method(fs.promises, "rename", () => { throw new Error("disk failure"); });
-  await assert.rejects(() => admin.updateAdminPassword("cannot-be-saved-password"), /disk failure/);
+  await assert.rejects(() => admin.updateAdminPassword("a-new-long-test-password", "cannot-be-saved-password"), /disk failure/);
   failure.mock.restore();
   assert.equal(await admin.verifyAdminCredentials("admin", "a-new-long-test-password"), true);
 });
@@ -284,15 +287,30 @@ test("bounded response sizes reject oversized source bodies", async () => {
   get.mock.restore();
 });
 
-test("login endpoint locks out repeated attempts with 429", async () => {
+test("login endpoint locks out repeated attempts from one verified client with 429", async () => {
   const { POST } = require("../app/api/admin/login/route.ts");
-  for (let i = 0; i < 5; i++) {
+  const previous = process.env.REELSER_TRUSTED_IP_HEADER;
+  process.env.REELSER_TRUSTED_IP_HEADER = "x-real-ip";
+  try {
+    const attempt = (ip, body) => POST(new NextRequest("http://localhost/api/admin/login", { method: "POST", headers: { "x-real-ip": ip }, body }));
+    for (let i = 0; i < 5; i++) assert.equal((await attempt("203.0.113.7", JSON.stringify({ username: "unknown", password: "wrong" }))).status, 401);
+    const response = await attempt("203.0.113.7", "{}");
+    assert.equal(response.status, 429);
+    assert.equal(response.headers.get("retry-after"), "60");
+    // Another visitor is not locked out by the first one.
+    assert.equal((await attempt("198.51.100.9", JSON.stringify({ username: "unknown", password: "wrong" }))).status, 401);
+  } finally {
+    if (previous === undefined) delete process.env.REELSER_TRUSTED_IP_HEADER;
+    else process.env.REELSER_TRUSTED_IP_HEADER = previous;
+  }
+});
+
+test("without a verified visitor IP, a few failed logins cannot lock the administrator out", async () => {
+  const { POST } = require("../app/api/admin/login/route.ts");
+  for (let i = 0; i < 8; i++) {
     const response = await POST(new NextRequest("http://localhost/api/admin/login", { method: "POST", body: JSON.stringify({ username: "unknown", password: "wrong" }) }));
     assert.equal(response.status, 401);
   }
-  const response = await POST(new NextRequest("http://localhost/api/admin/login", { method: "POST", body: "{}" }));
-  assert.equal(response.status, 429);
-  assert.equal(response.headers.get("retry-after"), "60");
 });
 
 test("saved public settings are applied without exposing administration data", async () => {

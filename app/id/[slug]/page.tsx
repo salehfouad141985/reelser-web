@@ -26,12 +26,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const url = `https://reelser.com/id/${slug}`;
-  const enUrl = `https://reelser.com/${config.enSlug}`;
-  const arUrl = `https://reelser.com/ar/${config.arSlug}`;
-  const esUrl = `https://reelser.com/es/${config.esSlug}`;
-  const ptUrl = `https://reelser.com/pt/${config.ptSlug}`;
-  const frUrl = `https://reelser.com/fr/${config.frSlug}`;
-  const trUrl = `https://reelser.com/tr/${config.trSlug}`;
   const ogImage = { url: "/opengraph-image", width: 1200, height: 630, alt: config.metaTitle };
 
   return {

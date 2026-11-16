@@ -285,15 +285,19 @@ export async function authenticateAdmin(username: string, password: string) {
   });
 }
 
-export async function updateAdminPassword(password: string) {
+export async function updateAdminPassword(currentPassword: string, password: string): Promise<"ok" | "invalid_current" | "invalid_new"> {
   secret();
-  if (typeof password !== "string" || password.length < 16 || password.length > 1024) return false;
+  if (typeof password !== "string" || password.length < 16 || password.length > 1024) return "invalid_new";
+  if (typeof currentPassword !== "string" || !currentPassword || currentPassword.length > 1024) return "invalid_current";
   return change(async (data) => {
+    // Verify the current password in the same transaction that replaces it,
+    // so a stolen session cookie alone cannot take over the account.
+    if (!(await credentialsMatch(data, currentPassword))) return "invalid_current" as const;
     data.salt = crypto.randomBytes(16).toString("hex");
     data.iterations = 210000;
     data.password_hash = await hashPassword(password, data.salt, data.iterations);
     data.sessions = {};
-    return true;
+    return "ok" as const;
   });
 }
 
